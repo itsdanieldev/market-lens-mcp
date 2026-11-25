@@ -7,6 +7,7 @@ import logging
 
 import httpx
 import pytest
+from mcp import Client
 
 from kr_invest import server
 from kr_invest.errors import MissingKeyError, NotFoundError, SourceError
@@ -222,10 +223,25 @@ async def test_tools_are_registered_with_mcp():
         "get_financials",
         "get_stock_prices",
     }
-    assert tools["get_financials"].inputSchema["required"] == ["ticker", "year"]
+    assert tools["get_financials"].input_schema["required"] == ["ticker", "year"]
 
 
 async def test_request_urls_with_keys_are_not_logged(app, caplog):
     with caplog.at_level(logging.INFO):
         await server.list_disclosures("005930")
     assert "test-dart-key" not in caplog.text
+
+
+async def test_error_messages_reach_the_mcp_client(make_app):
+    """안내가 필요한 오류는 가려지지 않고 모델에게 전달된다."""
+    make_app(dart_key=None)
+    async with Client(server.mcp) as client:
+        missing = await client.call_tool("get_financials", {"ticker": "005930", "year": 2024})
+        bad_date = await client.call_tool(
+            "get_stock_prices", {"ticker": "005930", "start_date": "어제"}
+        )
+        ok = await client.call_tool("resolve_ticker", {"query": "삼성전자"})
+    assert missing.is_error and "DART_API_KEY" in missing.content[0].text
+    assert bad_date.is_error and "날짜 형식" in bad_date.content[0].text
+    assert not ok.is_error
+    assert ok.structured_content["data"]["match"]["short_code"] == "005930"

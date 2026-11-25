@@ -34,7 +34,7 @@
 
 ## 설치
 
-Python 3.11 이상과 [uv](https://docs.astral.sh/uv/)가 필요합니다.
+Python 3.11 이상과 [uv](https://docs.astral.sh/uv/)가 필요합니다. MCP Python SDK는 2.x(`MCPServer`)를 씁니다.
 
 ```bash
 git clone https://github.com/itsdanieldev/market-lens-mcp.git

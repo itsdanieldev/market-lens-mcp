@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timedelta, timezone
 
+from .errors import InvalidInputError
+
 KST = timezone(timedelta(hours=9))
 
 
@@ -24,7 +26,7 @@ def parse_date(value: str | None, *, default: date) -> date:
     try:
         return datetime.strptime(digits, "%Y%m%d").date()
     except ValueError:
-        raise ValueError(f"날짜 형식이 잘못됐습니다: {value!r} (예: 2025-01-31)") from None
+        raise InvalidInputError(f"날짜 형식이 잘못됐습니다: {value!r} (예: 2025-01-31)") from None
 
 
 def ymd(d: date) -> str:

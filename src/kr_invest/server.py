@@ -11,13 +11,13 @@ from datetime import timedelta
 from typing import Annotated, Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
-from . import analytics
+from . import __version__, analytics
 from .cache import Cache
 from .config import Settings, load_settings
-from .errors import MissingKeyError, NotFoundError
+from .errors import InvalidInputError, MissingKeyError, NotFoundError
 from .models import (
     Account,
     Disclosure,
@@ -61,7 +61,7 @@ ACCOUNT_MATCHERS = {
     "total_equity": lambda n: n == "자본총계",
 }
 
-mcp = FastMCP("kr-invest", instructions=INSTRUCTIONS)
+mcp = MCPServer("kr-invest", instructions=INSTRUCTIONS, version=__version__)
 # httpx는 INFO 수준에서 요청 URL을 통째로 남기는데, 거기에 API 키가 쿼리로 들어 있다.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -167,7 +167,7 @@ async def resolve_ticker(
     app = get_app()
     query = query.strip()
     if not query:
-        raise ValueError("query가 비어 있습니다.")
+        raise InvalidInputError("query가 비어 있습니다.")
     warnings: list[str] = []
     fetched: list[Fetched] = []
     sources: list[str] = []
@@ -251,7 +251,7 @@ async def list_disclosures(
     end = parse_date(end_date, default=now_kst().date())
     start = parse_date(start_date, default=end - timedelta(days=30))
     if start > end:
-        raise ValueError("start_date가 end_date보다 늦습니다.")
+        raise InvalidInputError("start_date가 end_date보다 늦습니다.")
     kind = _disclosure_kind(disclosure_type)
     corp = await _find_corp(ticker)
     listing = await get_app().dart.list_disclosures(
@@ -294,7 +294,7 @@ def _disclosure_kind(value: str | None) -> str | None:
     for code, name in dart_api.DISCLOSURE_TYPES.items():
         if _norm(name) == _norm(text):
             return code
-    raise ValueError(
+    raise InvalidInputError(
         f"알 수 없는 공시유형: {value!r}. A~J 코드 또는 '정기공시' 같은 이름을 쓰세요."
     )
 
@@ -310,7 +310,7 @@ async def get_disclosure_text(
     """공시 원문의 본문 텍스트를 돌려준다. 길면 잘라서 주고 next_offset으로 이어 읽는다."""
     rcept_no = rcept_no.strip()
     if not re.fullmatch(r"\d{14}", rcept_no):
-        raise ValueError("rcept_no는 숫자 14자리여야 합니다.")
+        raise InvalidInputError("rcept_no는 숫자 14자리여야 합니다.")
     doc = await get_app().dart.document_text(rcept_no)
     full: str = doc.value
     chunk = full[offset : offset + max_chars]
@@ -432,7 +432,7 @@ async def get_stock_prices(
     end = parse_date(end_date, default=now_kst().date())
     start = parse_date(start_date, default=end - timedelta(days=90))
     if start > end:
-        raise ValueError("start_date가 end_date보다 늦습니다.")
+        raise InvalidInputError("start_date가 end_date보다 늦습니다.")
     fetched: list[Fetched] = []
     if _is_code(ticker):
         code = _clean_code(ticker)
