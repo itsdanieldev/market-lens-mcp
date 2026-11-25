@@ -267,6 +267,21 @@ async def test_source_errors_do_not_leak_keys(app, api):
     )
     with pytest.raises(SourceError, match="SERVICE_KEY_IS_NOT_REGISTERED_ERROR") as fsc_error:
         await server.get_stock_prices("005930")
+    # 실제로 받은 형식: 등록되지 않은 키는 HTTP 403에 JSON으로 온다
+    api.overrides["getStockPriceInfo"] = httpx.Response(
+        403,
+        json={
+            "OpenAPI_ServiceResponse": {
+                "cmmMsgHeader": {
+                    "errMsg": "SERVICE_KEY_IS_NOT_REGISTERED_ERROR",
+                    "returnAuthMsg": "등록되지 않은 서비스키",
+                    "returnReasonCode": "30",
+                }
+            }
+        },
+    )
+    with pytest.raises(SourceError, match="SERVICE_KEY_IS_NOT_REGISTERED_ERROR"):
+        await server.get_stock_prices("005930")
     api.overrides["corpCode"] = httpx.Response(503)
     server.get_app().cache.set("dart:corp_index", None, -1)
     with pytest.raises(SourceError, match="HTTP 503") as http_error:

@@ -104,10 +104,13 @@ def _parse(response: Any) -> tuple[list[dict[str, Any]], int]:
         header = payload["response"]["header"]
         body = payload["response"]["body"]
     except (ValueError, KeyError, TypeError):
-        # 키 오류 등은 resultType=json이어도 XML(또는 일반 텍스트)로 온다.
+        # 키 오류 등은 형식이 다르다. XML로 올 때도 있고, 실제로 받아 보면 HTTP 403에
+        # {"OpenAPI_ServiceResponse": {"cmmMsgHeader": {"errMsg": ...}}} JSON으로 오기도 한다.
         text = response.text
-        reason = re.search(r"<returnAuthMsg>(.*?)</returnAuthMsg>", text) or re.search(
-            r"<errMsg>(.*?)</errMsg>", text
+        reason = (
+            re.search(r"<returnAuthMsg>(.*?)</returnAuthMsg>", text)
+            or re.search(r"<errMsg>(.*?)</errMsg>", text)
+            or re.search(r'"errMsg"\s*:\s*"(.*?)"', text)
         )
         detail = reason.group(1) if reason else f"HTTP {response.status_code}"
         raise SourceError(
