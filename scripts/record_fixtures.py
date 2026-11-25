@@ -8,7 +8,7 @@
 그래도 커밋 전에 저장된 파일에 개인정보가 없는지 직접 확인해야 한다.
 
     uv run python scripts/record_fixtures.py              # 아직 녹화하지 않은 소스만
-    uv run python scripts/record_fixtures.py --only dart  # DART만
+    uv run python scripts/record_fixtures.py --only dart  # DART만 (dart_reports: 보고서 종류별 재무)
     uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만
     uv run python scripts/record_fixtures.py --force      # 이미 녹화한 소스도 다시 받기
 
@@ -174,6 +174,31 @@ def record_dart(http: httpx.Client, settings: Settings, today: date) -> Files:
     return files
 
 
+# 3분기보고서는 record_dart가 받는다. 나머지 보고서 종류는 응답 형식이 달라 따로 녹화한다.
+# 이미 제출된 것이 확실한 연도만 고른다: (파일 이름, 분기, 오늘 기준 몇 해 전)
+REPORT_FIXTURES = (
+    ("dart_financials_q1.json", 1, 1),
+    ("dart_financials_half.json", 2, 1),
+    ("dart_financials_annual.json", 4, 2),
+)
+
+
+def record_dart_reports(http: httpx.Client, settings: Settings, today: date) -> Files:
+    files: Files = {}
+    for filename, quarter, years_ago in REPORT_FIXTURES:
+        response = http.get(
+            f"{dart.BASE_URL}/fnlttSinglAcnt.json",
+            params={
+                "crtfc_key": settings.dart_api_key,
+                "corp_code": CORP_CODE,
+                "bsns_year": str(today.year - years_ago),
+                "reprt_code": dart.REPORT_CODES[quarter],
+            },
+        )
+        files[filename] = as_json(dart_json(filename, response))
+    return files
+
+
 def record_fsc(http: httpx.Client, settings: Settings, today: date) -> Files:
     common = {
         "serviceKey": settings.data_go_kr_key,
@@ -208,6 +233,7 @@ def record_fsc(http: httpx.Client, settings: Settings, today: date) -> Files:
 # 소스 이름 → (필요한 키의 환경변수 이름, Settings 속성, 녹화 함수)
 SOURCES: dict[str, tuple[str, str, Callable[[httpx.Client, Settings, date], Files]]] = {
     "dart": ("DART_API_KEY", "dart_api_key", record_dart),
+    "dart_reports": ("DART_API_KEY", "dart_api_key", record_dart_reports),
     "fsc": ("DATA_GO_KR_KEY", "data_go_kr_key", record_fsc),
 }
 
