@@ -78,7 +78,11 @@ def dart_json(name: str, response: httpx.Response) -> dict:
 
 def fsc_json(name: str, response: httpx.Response) -> dict:
     payload = parse_json(name, response)
-    header = (payload.get("response") or {}).get("header") or {}
+    header = (payload.get("response") or {}).get("header") if isinstance(payload, dict) else None
+    if not isinstance(header, dict):
+        # 문서와 다른 모양의 응답이다. 원인을 볼 수 있게 앞부분을 그대로 보여 준다.
+        snippet = " ".join(response.text.split())[:300]
+        raise RecordError(f"{name}: 예상과 다른 응답(HTTP {response.status_code}) {snippet}")
     if header.get("resultCode") != "00":
         raise RecordError(
             f"{name}: 공공데이터포털 오류 {header.get('resultCode')} {header.get('resultMsg')}"
@@ -250,7 +254,8 @@ def main() -> int:
                 failed = True
                 continue
             except RecordError as exc:
-                print(f"[{name}] 저장하지 않음: {exc}", file=sys.stderr)
+                # 오류 응답이 요청 값을 되돌려 줄 수 있어 키는 가리고 출력한다.
+                print(f"[{name}] 저장하지 않음: {str(exc).replace(secret, '***')}", file=sys.stderr)
                 failed = True
                 continue
             if any(secret.encode() in content for content in files.values()):
