@@ -17,6 +17,13 @@ from market_lens.sources import _base
 FIXTURES = Path(__file__).parent / "fixtures"
 DART_KEY = "test-dart-key"
 FSC_KEY = "test-fsc-key"
+# DART 보고서 코드 → 녹화본 (1분기, 반기, 3분기, 사업보고서)
+FINANCIAL_FIXTURES = {
+    "11013": "dart_financials_q1.json",
+    "11012": "dart_financials_half.json",
+    "11014": "dart_financials.json",
+    "11011": "dart_financials_annual.json",
+}
 
 
 def zipped(name: str, content: bytes) -> bytes:
@@ -53,7 +60,8 @@ class FakeApi:
             body = zipped(name, (FIXTURES / "dart_document.xml").read_bytes())
             return httpx.Response(200, content=body)
         if path.endswith("/fnlttSinglAcnt.json"):
-            return httpx.Response(200, content=(FIXTURES / "dart_financials.json").read_bytes())
+            name = FINANCIAL_FIXTURES[params["reprt_code"]]
+            return httpx.Response(200, content=(FIXTURES / name).read_bytes())
         if path.endswith("/getItemInfo"):
             return httpx.Response(200, content=(FIXTURES / "fsc_items.json").read_bytes())
         if path.endswith("/getStockPriceInfo"):

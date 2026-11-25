@@ -215,6 +215,67 @@ async def test_get_financials_quarter(app):
     assert result["as_of"] == "2025-09-30"
 
 
+async def test_get_financials_first_quarter(app):
+    result = await server.get_financials("삼성전자", 2025, 1)
+    data, computed = result["data"], result["computed"]
+    assert data["report"] == "1분기보고서" and data["rcept_no"] == "20250515001922"
+    revenue = data["accounts"]["revenue"]
+    # 1분기는 3개월 금액과 누적 금액이 같다
+    assert revenue["current"] == revenue["cumulative"] == 79_140_503_000_000
+    assert revenue["current_period"] == "2025.01.01 ~ 2025.03.31"
+    assert revenue["prior_period"] == "2024.01.01 ~ 2024.03.31"
+    assert computed["revenue_change_pct"] == computed["revenue_cumulative_change_pct"] == 10.05
+    assert computed["operating_income_change_pct"] == 1.2
+    assert computed["operating_margin_pct"] == 8.45
+    assert computed["total_assets_change_pct"] == 0.36
+    assert result["as_of"] == "2025-03-31"
+
+
+async def test_get_financials_half_year(app):
+    result = await server.get_financials("삼성전자", 2025, 2)
+    data, computed = result["data"], result["computed"]
+    assert data["report"] == "반기보고서" and data["period_type"] == "quarter"
+    revenue = data["accounts"]["revenue"]
+    # 반기보고서도 기간 표기는 누적(01.01 ~ 06.30)이고 current는 2분기 석 달 금액이다
+    assert revenue["current"] == 74_566_317_000_000
+    assert revenue["cumulative"] == 153_706_820_000_000
+    assert revenue["current_period"] == "2025.04.01 ~ 2025.06.30"
+    assert revenue["prior_period"] == "2024.04.01 ~ 2024.06.30"
+    assert computed["revenue_change_pct"] == 0.67
+    assert computed["revenue_cumulative_change_pct"] == 5.29
+    assert computed["operating_income_change_pct"] == -55.23
+    assert computed["operating_income_cumulative_change_pct"] == -33.36
+    assert computed["net_income_change_pct"] == -48.01
+    assert computed["debt_to_equity_pct"] == 26.36
+    assert result["as_of"] == "2025-06-30"
+
+
+async def test_get_financials_annual(app):
+    result = await server.get_financials("삼성전자", 2024)
+    data, computed = result["data"], result["computed"]
+    assert data["report"] == "사업보고서" and data["period_type"] == "annual"
+    assert data["quarter"] == 4 and data["rcept_no"] == "20250311001085"
+    assert data["accounts"]["revenue"] == {
+        "label": "매출액",
+        "current": 300_870_903_000_000,
+        "current_period": "2024.01.01 ~ 2024.12.31",
+        "prior": 258_935_494_000_000,
+        "prior_period": "2023.01.01 ~ 2023.12.31",
+        # 사업보고서에는 누적 금액 필드가 없다
+        "cumulative": None,
+        "prior_cumulative": None,
+    }
+    assert data["accounts"]["total_equity"]["prior_period"] == "2023.12.31 현재"
+    assert computed["revenue_change_pct"] == 16.2
+    assert computed["operating_income_change_pct"] == 398.34
+    assert computed["net_income_change_pct"] == 122.45
+    assert computed["operating_margin_pct"] == 10.88
+    assert computed["debt_to_equity_pct"] == 27.93
+    assert computed["total_equity_change_pct"] == 10.59
+    assert "revenue_cumulative_change_pct" not in computed
+    assert result["warnings"] == [] and result["as_of"] == "2024-12-31"
+
+
 async def test_get_financials_skips_change_when_prior_is_a_loss(app, api):
     payload = json.loads((FIXTURES / "dart_financials.json").read_text(encoding="utf-8"))
     for row in payload["list"]:

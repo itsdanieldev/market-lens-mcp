@@ -130,7 +130,7 @@ uv run ruff format --check .
 
 ```bash
 uv run python scripts/record_fixtures.py              # 아직 녹화하지 않은 소스만
-uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만 (dart도 가능)
+uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만 (dart, dart_reports도 가능)
 ```
 
 API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화한 소스는 `--force` 없이는 API를 다시 호출하지 않습니다. 한 소스가 연결에 실패해도 다른 소스의 녹화는 남습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다. 녹화하면 값이 바뀌므로 `tests/test_tools.py`의 기대값도 함께 고쳐야 합니다.

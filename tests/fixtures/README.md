@@ -8,6 +8,9 @@ DART 파일은 **실제 API 응답 녹화본**이고, 공공데이터포털(`fsc
 | `dart_list.json` | DART `list.json` (삼성전자, 2026-10-26 ~ 2026-11-25, 41건 중 첫 20건) | 실제 응답, 개인 제출인 이름은 가명 |
 | `dart_document.xml` | DART `document.xml` (ZIP 안의 원문, 접수번호 20261118000151) | 실제 응답, 개인정보는 더미 값 |
 | `dart_financials.json` | DART `fnlttSinglAcnt.json` (삼성전자 2025년 3분기보고서) | 실제 응답 |
+| `dart_financials_q1.json` | 같은 API (삼성전자 2025년 1분기보고서) | 실제 응답 |
+| `dart_financials_half.json` | 같은 API (삼성전자 2025년 반기보고서) | 실제 응답 |
+| `dart_financials_annual.json` | 같은 API (삼성전자 2024년 사업보고서) | 실제 응답 |
 | `fsc_items.json` | 금융위원회 KRX상장종목정보 `getItemInfo` | 샘플 (지어낸 값) |
 | `fsc_prices.json` | 금융위원회 주식시세정보 `getStockPriceInfo` | 샘플 (지어낸 값) |
 
@@ -30,6 +33,6 @@ uv run python scripts/record_fixtures.py --only fsc
 
 ## 다시 녹화할 때
 
-스크립트는 API별로 최대 20건을 한 번만 받아 저장합니다. `RECORDED.json`에 적힌 소스는 `--force`를 붙이지 않는 한 다시 호출하지 않으며, 테스트는 항상 이 파일들만 읽습니다. API 키는 응답 본문에 들어가지 않고, 스크립트가 저장 직전에 한 번 더 확인합니다.
+녹화 소스는 `dart`(고유번호, 공시 목록, 원문, 3분기 재무), `dart_reports`(1분기·반기·사업보고서 재무), `fsc` 셋이고 `--only`로 하나만 고를 수 있습니다. 스크립트는 API별로 최대 20건을 한 번만 받아 저장합니다. `RECORDED.json`에 적힌 소스는 `--force`를 붙이지 않는 한 다시 호출하지 않으며, 테스트는 항상 이 파일들만 읽습니다. API 키는 응답 본문에 들어가지 않고, 스크립트가 저장 직전에 한 번 더 확인합니다.
 
 다시 녹화하면 값이 바뀌므로 테스트 기대값도 함께 고쳐야 합니다. 스크립트는 공시 목록의 개인 제출인 이름을 가명으로 바꾸고 회사가 낸 공시의 원문만 고르지만, 커밋하기 전에 저장된 파일에 개인정보가 없는지 직접 확인하세요.
