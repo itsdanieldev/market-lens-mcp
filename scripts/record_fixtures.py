@@ -3,7 +3,11 @@
 .env에 DART_API_KEY, DATA_GO_KR_KEY가 있어야 한다. 키는 요청 파라미터로만 쓰이고
 응답 본문에는 들어 있지 않으므로 저장되는 파일에 남지 않는다.
 
-    uv run python scripts/record_fixtures.py
+    uv run python scripts/record_fixtures.py          # 최초 1회만 호출
+    uv run python scripts/record_fixtures.py --force  # 다시 받아 덮어쓰기
+
+API별로 최대 20건만 한 번 받아 파일로 저장하고, 이후 테스트는 그 파일만 읽는다.
+이미 녹화한 적이 있으면(RECORDED.json 존재) API를 호출하지 않고 끝낸다.
 
 주의: 값이 실제 수치로 바뀌므로 tests/test_tools.py의 기대값도 함께 고쳐야 한다.
 """
@@ -29,6 +33,9 @@ CORP_CODE = "00126380"  # 삼성전자
 STOCK_CODE = "005930"
 SAMPLE_STOCK_CODES = ("005930", "006400", "000660")
 MAX_DOCUMENT_BYTES = 200_000
+MAX_ROWS = 20  # API별로 받아 오는 최대 건수
+MAX_DOCUMENT_TRIES = 3
+MANIFEST = FIXTURES / "RECORDED.json"
 
 
 def save_json(name: str, response: httpx.Response) -> dict:
@@ -45,13 +52,20 @@ def unzip_first(content: bytes) -> bytes:
 
 
 def main() -> int:
+    if MANIFEST.exists() and "--force" not in sys.argv[1:]:
+        print(f"이미 녹화돼 있습니다({MANIFEST.name}). 다시 받으려면 --force를 붙이세요.")
+        return 0
     settings = load_settings()
     if not (settings.dart_api_key and settings.data_go_kr_key):
         print("DART_API_KEY와 DATA_GO_KR_KEY를 .env에 넣어 주세요.", file=sys.stderr)
         return 1
     today = now_kst().date()
     dart_key = {"crtfc_key": settings.dart_api_key}
-    fsc_common = {"serviceKey": settings.data_go_kr_key, "resultType": "json", "numOfRows": 100}
+    fsc_common = {
+        "serviceKey": settings.data_go_kr_key,
+        "resultType": "json",
+        "numOfRows": MAX_ROWS,
+    }
 
     with httpx.Client(timeout=30.0) as http:
         # 고유번호 전체는 수십 MB라 샘플 종목만 남긴다.
@@ -74,12 +88,12 @@ def main() -> int:
                     "corp_code": CORP_CODE,
                     "bgn_de": ymd(today - timedelta(days=30)),
                     "end_de": ymd(today),
-                    "page_count": 100,
+                    "page_count": MAX_ROWS,
                 },
             ),
         )
-        # 가장 짧은 원문 하나를 고른다.
-        for row in listing.get("list") or []:
+        # 크기가 작은 원문 하나만 저장한다(시도는 최대 3건).
+        for row in (listing.get("list") or [])[:MAX_DOCUMENT_TRIES]:
             response = http.get(
                 f"{dart.BASE_URL}/document.xml", params={**dart_key, "rcept_no": row["rcept_no"]}
             )
@@ -125,6 +139,10 @@ def main() -> int:
                 },
             ),
         )
+    MANIFEST.write_text(
+        json.dumps({"recorded_on": today.isoformat(), "max_rows": MAX_ROWS}, indent=1) + "\n",
+        encoding="utf-8",
+    )
     print("끝. 기대값을 고친 뒤 uv run pytest로 확인하세요.")
     return 0
 

@@ -130,6 +130,8 @@ uv run ruff format --check .
 uv run python scripts/record_fixtures.py
 ```
 
+API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화했다면 `--force` 없이는 API를 다시 호출하지 않습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다.
+
 레포 구조:
 
 ```
