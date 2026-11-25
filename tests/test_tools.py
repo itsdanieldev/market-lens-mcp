@@ -96,6 +96,28 @@ async def test_get_disclosure_text_truncates_and_pages(app):
     assert len(short) == 2000
 
 
+def test_document_to_text_handles_html_style_markup():
+    markup = (
+        "<BODY><STYLE>.x { color: red; }</STYLE><TITLE>배당 결정</TITLE>"
+        "<TABLE><TR><TD>1주당 배당금(원)</TD><TD>100</TD></TR></TABLE>"
+        "<P>중요사항:&nbsp;해당 없음 &amp; 끝.<BR/>다음 줄</P></BODY>"
+    )
+    assert document_to_text(markup).split("\n") == [
+        "배당 결정",
+        "1주당 배당금(원) | 100 |",
+        "중요사항: 해당 없음 & 끝.",
+        "다음 줄",
+    ]
+
+
+def test_quarter_income_period_is_narrowed_to_three_months():
+    assert server._three_months("2025.01.01 ~ 2025.09.30") == "2025.07.01 ~ 2025.09.30"
+    assert server._three_months("2025.01.01 ~ 2025.03.31") == "2025.01.01 ~ 2025.03.31"
+    assert server._three_months("2024.10.01 ~ 2025.01.31") == "2024.11.01 ~ 2025.01.31"
+    assert server._three_months("2025.09.30 현재") == "2025.09.30 현재"
+    assert server._three_months(None) is None
+
+
 async def test_get_disclosure_text_rejects_bad_number(app):
     with pytest.raises(ValueError):
         await server.get_disclosure_text("1234")

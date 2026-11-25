@@ -77,7 +77,9 @@ class Account(BaseModel):
 
     label: str = Field(description="DART 계정명")
     current: int | None = Field(description="당기 금액. 분기·반기 손익 항목은 3개월 금액")
-    current_period: str | None = None
+    current_period: str | None = Field(
+        default=None, description="current 금액의 기간. 분기·반기 손익은 해당 3개월 구간"
+    )
     prior: int | None = Field(
         description="비교 금액. 손익은 전년 동기, 재무상태표는 전기말(분기) 또는 전년말(연간)"
     )

@@ -69,10 +69,20 @@ def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+# 닫힐 때 줄을 바꾸는 태그. DART 전용 서식(dart4.xsd)의 표지·제목 태그를 포함한다.
+_BLOCK_TAGS = (
+    r"p|tr|table|table-group|title|cover-title|document-name|company-name|"
+    r"div|li|h\d|section[^>]*"
+)
+
+
 def document_to_text(markup: str) -> str:
     """DART 공시 원문(XML/HTML 혼합 마크업)에서 본문 텍스트만 남긴다."""
-    text = re.sub(r"(?is)<(style|script)\b.*?</\1>", " ", markup)
-    text = re.sub(r"(?i)</(p|tr|table|title|div|li|h\d|section[^>]*)>|<br\s*/?>", "\n", text)
+    # 서식 버전, 추출용 요약 같은 머리 정보는 본문이 아니다.
+    text = re.sub(r"(?is)<(style|script|formula-version|summary)\b.*?</\1>", " ", markup)
+    # 원문은 표의 칸마다 줄을 바꿔 적는다. 줄바꿈은 태그로만 정해 한 행이 한 줄이 되게 한다.
+    text = re.sub(r"\s*\n\s*", " ", text)
+    text = re.sub(rf"(?i)</({_BLOCK_TAGS})>|<br\s*/?>", "\n", text)
     text = re.sub(r"(?i)</(td|th|te|tu)>", " | ", text)
     text = re.sub(r"(?s)<[^>]+>", "", text)
     text = html.unescape(text).replace("\xa0", " ")

@@ -329,6 +329,19 @@ async def get_disclosure_text(
     return _envelope(dart_api.SOURCE, ymd_to_iso(rcept_no[:8]), data, doc)
 
 
+def _as_is(period: str | None) -> str | None:
+    return period
+
+
+def _three_months(period: str | None) -> str | None:
+    """'2025.01.01 ~ 2025.09.30' 같은 누적 구간을 마지막 3개월 구간으로 바꾼다."""
+    found = re.fullmatch(r"\s*\d{4}\.\d{2}\.\d{2}\s*~\s*((\d{4})\.(\d{2})\.\d{2})\s*", period or "")
+    if not found:
+        return period
+    months = int(found.group(2)) * 12 + int(found.group(3)) - 3  # 0부터 센 시작 월
+    return f"{months // 12}.{months % 12 + 1:02d}.01 ~ {found.group(1)}"
+
+
 @mcp.tool()
 async def get_financials(
     ticker: Annotated[str, Field(description="종목명 또는 6자리 종목코드")],
@@ -364,12 +377,14 @@ async def get_financials(
             accounts[key] = None
             warnings.append(f"{key} 계정을 응답에서 찾지 못했습니다.")
             continue
+        # 분기·반기 손익의 기간 표기는 누적 구간인데 금액은 3개월분이라 기간을 금액에 맞춘다.
+        period = _three_months if quarter != 4 and row.get("sj_div") == "IS" else _as_is
         accounts[key] = Account(
             label=row.get("account_nm", ""),
             current=to_int(row.get("thstrm_amount")),
-            current_period=row.get("thstrm_dt"),
+            current_period=period(row.get("thstrm_dt")),
             prior=to_int(row.get("frmtrm_amount")),
-            prior_period=row.get("frmtrm_dt"),
+            prior_period=period(row.get("frmtrm_dt")),
             cumulative=to_int(row.get("thstrm_add_amount")),
             prior_cumulative=to_int(row.get("frmtrm_add_amount")),
         )
