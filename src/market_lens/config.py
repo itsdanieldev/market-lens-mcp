@@ -19,7 +19,9 @@ class Settings:
 
 def load_settings() -> Settings:
     load_dotenv(find_dotenv(usecwd=True))
-    cache_dir = Path(os.environ.get("KR_INVEST_CACHE_DIR") or Path.home() / ".cache" / "kr-invest")
+    cache_dir = Path(
+        os.environ.get("MARKET_LENS_CACHE_DIR") or Path.home() / ".cache" / "market-lens"
+    )
     data_key = (os.environ.get("DATA_GO_KR_KEY") or "").strip() or None
     if data_key and "%" in data_key:
         # 포털의 Encoding 키를 넣은 경우: httpx가 다시 인코딩하므로 먼저 풀어 둔다.

@@ -34,9 +34,9 @@ from pathlib import Path
 
 import httpx
 
-from kr_invest.config import Settings, load_settings
-from kr_invest.sources import dart, fsc
-from kr_invest.util import now_kst, ymd
+from market_lens.config import Settings, load_settings
+from market_lens.sources import dart, fsc
+from market_lens.util import now_kst, ymd
 
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 CORP_CODE = "00126380"  # 삼성전자

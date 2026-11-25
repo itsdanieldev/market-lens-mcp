@@ -1,4 +1,4 @@
-# kr-invest-agent
+# market-lens-mcp
 
 한국 주식 리서치용 MCP 서버입니다. Claude Desktop 같은 MCP 클라이언트에 붙이면 상장사의 공시, 재무제표, 주가를 공식 API에서 가져와 출처와 기준일이 붙은 답을 만들 수 있습니다.
 
@@ -72,9 +72,9 @@ cp .env.example .env   # 키 두 개를 채웁니다
 ```json
 {
   "mcpServers": {
-    "kr-invest": {
+    "market-lens": {
       "command": "uv",
-      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "kr-invest-mcp"]
+      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "market-lens-mcp"]
     }
   }
 }
@@ -83,7 +83,7 @@ cp .env.example .env   # 키 두 개를 채웁니다
 키는 저장소 루트의 `.env`에서 읽습니다. Claude Code에서는 다음 한 줄로 등록합니다.
 
 ```bash
-claude mcp add kr-invest -- uv --directory /절대/경로/market-lens-mcp run kr-invest-mcp
+claude mcp add market-lens -- uv --directory /절대/경로/market-lens-mcp run market-lens-mcp
 ```
 
 ## 질문 예시
@@ -96,7 +96,7 @@ claude mcp add kr-invest -- uv --directory /절대/경로/market-lens-mcp run kr
 
 ## 캐시
 
-호출 한도를 아끼려고 응답을 SQLite(`~/.cache/kr-invest/cache.sqlite3`)에 저장합니다. 위치는 `KR_INVEST_CACHE_DIR`로 바꿉니다.
+호출 한도를 아끼려고 응답을 SQLite(`~/.cache/market-lens/cache.sqlite3`)에 저장합니다. 위치는 `MARKET_LENS_CACHE_DIR`로 바꿉니다.
 
 | 데이터 | 유효 기간 |
 | --- | --- |
@@ -138,7 +138,7 @@ API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 �
 레포 구조:
 
 ```
-src/kr_invest/
+src/market_lens/
 ├── server.py        # MCP 서버 진입점, 도구 5개
 ├── sources/dart.py  # DART 공시, 재무, 고유번호
 ├── sources/fsc.py   # 금융위원회 주식시세, 상장종목

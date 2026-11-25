@@ -7,24 +7,24 @@ MCP SDK 2.x는 ToolError의 메시지만 모델에게 전달하고, 그 밖의 �
 from mcp.server.mcpserver.exceptions import ToolError
 
 
-class KrInvestError(ToolError):
+class MarketLensError(ToolError):
     pass
 
 
-class InvalidInputError(KrInvestError, ValueError):
+class InvalidInputError(MarketLensError, ValueError):
     """도구 인자가 잘못됨(날짜 형식, 공시유형, 접수번호 등)."""
 
 
-class MissingKeyError(KrInvestError):
+class MissingKeyError(MarketLensError):
     def __init__(self, env_name: str, where: str):
         super().__init__(
             f"{env_name} 환경변수가 없습니다. {where}에서 키를 발급받아 .env에 넣어 주세요."
         )
 
 
-class SourceError(KrInvestError):
+class SourceError(MarketLensError):
     """데이터 소스가 오류를 돌려줬거나 응답을 해석할 수 없음."""
 
 
-class NotFoundError(KrInvestError):
+class NotFoundError(MarketLensError):
     pass

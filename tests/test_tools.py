@@ -12,9 +12,9 @@ import httpx
 import pytest
 from mcp import Client
 
-from kr_invest import server
-from kr_invest.errors import MissingKeyError, NotFoundError, SourceError
-from kr_invest.sources.dart import document_to_text
+from market_lens import server
+from market_lens.errors import MissingKeyError, NotFoundError, SourceError
+from market_lens.sources.dart import document_to_text
 
 from .conftest import FIXTURES
 

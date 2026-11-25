@@ -1,4 +1,4 @@
-"""kr-invest MCP 서버: 한국 주식 리서치 도구 5개.
+"""market-lens MCP 서버: 한국 주식 리서치 도구 5개.
 
 모든 도구는 source, as_of가 붙은 공통 형식(models.Envelope)으로 응답한다.
 """
@@ -61,7 +61,7 @@ ACCOUNT_MATCHERS = {
     "total_equity": lambda n: n == "자본총계",
 }
 
-mcp = MCPServer("kr-invest", instructions=INSTRUCTIONS, version=__version__)
+mcp = MCPServer("market-lens", instructions=INSTRUCTIONS, version=__version__)
 # httpx는 INFO 수준에서 요청 URL을 통째로 남기는데, 거기에 API 키가 쿼리로 들어 있다.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 

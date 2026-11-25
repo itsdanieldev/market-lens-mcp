@@ -9,10 +9,10 @@ from pathlib import Path
 import httpx
 import pytest
 
-from kr_invest import server
-from kr_invest.cache import Cache
-from kr_invest.config import Settings
-from kr_invest.sources import _base
+from market_lens import server
+from market_lens.cache import Cache
+from market_lens.config import Settings
+from market_lens.sources import _base
 
 FIXTURES = Path(__file__).parent / "fixtures"
 DART_KEY = "test-dart-key"

@@ -2,9 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from kr_invest import analytics
-from kr_invest.cache import Cache, seconds_until_kst_midnight
-from kr_invest.util import KST, parse_date, to_int
+from market_lens import analytics
+from market_lens.cache import Cache, seconds_until_kst_midnight
+from market_lens.util import KST, parse_date, to_int
 
 
 def test_cache_roundtrip_and_expiry(tmp_path):
