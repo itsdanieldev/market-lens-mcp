@@ -17,7 +17,7 @@ from pydantic import Field
 from . import __version__, analytics
 from .cache import Cache
 from .config import Settings, load_settings
-from .errors import InvalidInputError, MissingKeyError, NotFoundError
+from .errors import InvalidInputError, MissingKeyError, NotFoundError, SourceError
 from .models import (
     Account,
     Disclosure,
@@ -183,11 +183,26 @@ async def resolve_ticker(
     else:
         warnings.append("DART_API_KEY가 없어 corp_code를 채우지 못했습니다.")
 
+    items: Fetched | None = None
     if app.settings.data_go_kr_key:
-        if _is_code(query):
-            items = await app.fsc.search_items(code=_clean_code(query))
-        else:
-            items = await app.fsc.search_items(name=query)
+        try:
+            if _is_code(query):
+                items = await app.fsc.search_items(code=_clean_code(query))
+            else:
+                items = await app.fsc.search_items(name=query)
+        except SourceError as exc:
+            # 포털 장애나 해외 IP 차단 때도 DART만으로 종목은 확인해 준다.
+            if not app.settings.dart_api_key:
+                raise
+            warnings.append(
+                f"공공데이터포털 조회에 실패해 ISIN과 시장 구분을 채우지 못했습니다({exc})"
+            )
+    elif app.settings.dart_api_key:
+        warnings.append("DATA_GO_KR_KEY가 없어 ISIN과 시장 구분을 채우지 못했습니다.")
+    else:
+        raise MissingKeyError("DATA_GO_KR_KEY", "https://www.data.go.kr")
+
+    if items is not None:
         fetched.append(items)
         sources.insert(0, fsc_api.SOURCE_ITEMS)
         for item in items.value:
@@ -203,15 +218,12 @@ async def resolve_ticker(
             )
         if items.value:
             as_of = ymd_to_iso(max(i["base_date"] for i in items.value))
-    elif app.settings.dart_api_key:
-        warnings.append("DATA_GO_KR_KEY가 없어 ISIN과 시장 구분을 채우지 못했습니다.")
+    else:
         corp, candidates = await app.dart.find_corp(query)
         for c in [corp] if corp else candidates:
             tickers.append(
                 Ticker(short_code=c["stock_code"], name=c["corp_name"], corp_code=c["corp_code"])
             )
-    else:
-        raise MissingKeyError("DATA_GO_KR_KEY", "https://www.data.go.kr")
 
     if _is_code(query):
         exact = [t for t in tickers if t.short_code == _clean_code(query)]

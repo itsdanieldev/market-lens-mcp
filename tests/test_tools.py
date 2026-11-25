@@ -56,6 +56,38 @@ async def test_resolve_ticker_with_only_dart_key(make_app):
     assert any("DATA_GO_KR_KEY" in w for w in result["warnings"])
 
 
+async def test_resolve_ticker_falls_back_to_dart_when_portal_fails(make_app, api):
+    api.overrides["getItemInfo"] = httpx.Response(
+        403,
+        json={
+            "OpenAPI_ServiceResponse": {
+                "cmmMsgHeader": {"errMsg": "SERVICE_KEY_IS_NOT_REGISTERED_ERROR"}
+            }
+        },
+    )
+    make_app()
+    result = await server.resolve_ticker("삼성전자")
+    assert_envelope(result)
+    assert result["data"]["match"] == {
+        "short_code": "005930",
+        "name": "삼성전자",
+        "isin": None,
+        "corp_code": "00126380",
+        "market": None,
+    }
+    assert result["source"] == "DART OpenAPI (금융감독원 전자공시시스템)"
+    assert any(
+        "공공데이터포털" in w and "SERVICE_KEY_IS_NOT_REGISTERED_ERROR" in w
+        for w in result["warnings"]
+    )
+    assert "test-fsc-key" not in json.dumps(result, ensure_ascii=False)
+
+    # DART 키마저 없으면 대신 답할 곳이 없으므로 오류를 그대로 알린다
+    make_app(dart_key=None)
+    with pytest.raises(SourceError, match="SERVICE_KEY_IS_NOT_REGISTERED_ERROR"):
+        await server.resolve_ticker("삼성전자")
+
+
 async def test_list_disclosures(app, api):
     result = await server.list_disclosures(
         "삼성전자",

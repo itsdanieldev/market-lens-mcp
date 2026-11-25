@@ -115,6 +115,7 @@ claude mcp add kr-invest -- uv --directory /절대/경로/market-lens-mcp run kr
 - 분기 손익의 `current_period`는 그 3개월 구간입니다. DART 원본은 누적 구간(예: 01.01 ~ 09.30)으로 표기하므로 서버가 금액에 맞게 바꿔서 돌려줍니다.
 - 재무 자료는 DART 주요계정 API가 제공하는 2015년 이후 사업연도만 조회됩니다.
 - 공공데이터포털은 해외 IP에서 접속이 막힐 수 있습니다. 해외 서버에서 돌리면 시세 도구가 연결 오류를 낼 수 있습니다.
+- 공공데이터포털 조회가 실패해도 `resolve_ticker`는 DART만으로 종목코드와 corp_code를 돌려주고, ISIN과 시장 구분을 채우지 못했다고 `warnings`에 적습니다.
 - 웹 크롤링은 하지 않습니다. 공시 본문도 DART 공식 원문 API로 받습니다.
 
 ## 개발
