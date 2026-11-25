@@ -1,14 +1,35 @@
 # 테스트 픽스처
 
-공식 API 문서의 응답 형식에 맞춰 만든 **샘플**입니다. 필드 이름과 구조는 실제 응답과 같지만 금액, 주가, 공시 제목은 지어낸 값이며 실제 수치가 아닙니다.
+DART 파일은 **실제 API 응답 녹화본**이고, 공공데이터포털(`fsc_*`) 파일은 아직 공식 문서 형식에 맞춰 만든 **샘플**입니다. 어떤 소스가 언제 녹화됐는지는 `RECORDED.json`에 적혀 있습니다.
 
-실제 응답으로 바꾸려면 저장소 루트에서 `uv run python scripts/record_fixtures.py`를 실행하세요. API별로 최대 20건을 한 번만 받아 저장하고 `RECORDED.json`을 남깁니다. 그 뒤로는 `--force`를 붙이지 않는 한 API를 다시 호출하지 않으며, 테스트는 항상 이 파일들만 읽습니다. API 키는 응답 본문에 들어가지 않으므로 파일에 남지 않습니다.
+| 파일 | API | 상태 |
+| --- | --- | --- |
+| `dart_corpcode.xml` | DART `corpCode.xml` (ZIP 안의 `CORPCODE.xml`, 3개 회사만 남김) | 실제 응답 (2026-11-25 녹화) |
+| `dart_list.json` | DART `list.json` (삼성전자, 2026-10-26 ~ 2026-11-25, 41건 중 첫 20건) | 실제 응답, 개인 제출인 이름은 가명 |
+| `dart_document.xml` | DART `document.xml` (ZIP 안의 원문, 접수번호 20261118000151) | 실제 응답, 개인정보는 더미 값 |
+| `dart_financials.json` | DART `fnlttSinglAcnt.json` (삼성전자 2025년 3분기보고서) | 실제 응답 |
+| `fsc_items.json` | 금융위원회 KRX상장종목정보 `getItemInfo` | 샘플 (지어낸 값) |
+| `fsc_prices.json` | 금융위원회 주식시세정보 `getStockPriceInfo` | 샘플 (지어낸 값) |
 
-| 파일 | API |
-| --- | --- |
-| `dart_corpcode.xml` | DART `corpCode.xml` (ZIP 안의 `CORPCODE.xml`, 일부 회사만) |
-| `dart_list.json` | DART `list.json` |
-| `dart_document.xml` | DART `document.xml` (ZIP 안의 원문) |
-| `dart_financials.json` | DART `fnlttSinglAcnt.json` (3분기보고서) |
-| `fsc_items.json` | 금융위원회 KRX상장종목정보 `getItemInfo` |
-| `fsc_prices.json` | 금융위원회 주식시세정보 `getStockPriceInfo` |
+## 녹화본에서 바꾼 부분
+
+응답의 구조와 금액은 받은 그대로이고, 저장소에 개인정보를 남기지 않으려고 아래만 바꿨습니다.
+
+- `dart_list.json`: 회사가 아닌 개인 제출인(`flr_nm`)의 이름을 `보고자01` 같은 가명으로 바꿨습니다.
+- `dart_document.xml`: 임원 소유상황보고서라서 보고자의 이름, 생년월일, 주소, 전화번호, 이메일이 들어 있었습니다. 이 값들을 `홍길동`, `000000` 같은 더미로 바꿨습니다. 태그와 표 구조는 그대로입니다.
+
+## 공공데이터포털 샘플
+
+`fsc_*` 두 파일은 필드 이름과 구조만 공식 문서를 따랐고 주가와 날짜는 실제 수치가 아닙니다. 녹화를 시도한 클라우드 환경에서 `apis.data.go.kr` 연결이 되지 않아(해외 IP 차단으로 추정) 실제 응답으로 바꾸지 못했습니다. 국내 네트워크에서 아래를 한 번 실행하면 이 두 파일만 실제 응답으로 바뀝니다.
+
+```bash
+uv run python scripts/record_fixtures.py --only fsc
+```
+
+그 뒤 `tests/test_tools.py`에서 시세와 종목 검색 기대값(날짜, 가격, 수익률)을 녹화된 값으로 고쳐야 합니다.
+
+## 다시 녹화할 때
+
+스크립트는 API별로 최대 20건을 한 번만 받아 저장합니다. `RECORDED.json`에 적힌 소스는 `--force`를 붙이지 않는 한 다시 호출하지 않으며, 테스트는 항상 이 파일들만 읽습니다. API 키는 응답 본문에 들어가지 않고, 스크립트가 저장 직전에 한 번 더 확인합니다.
+
+다시 녹화하면 값이 바뀌므로 테스트 기대값도 함께 고쳐야 합니다. 스크립트는 공시 목록의 개인 제출인 이름을 가명으로 바꾸고 회사가 낸 공시의 원문만 고르지만, 커밋하기 전에 저장된 파일에 개인정보가 없는지 직접 확인하세요.

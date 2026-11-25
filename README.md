@@ -125,13 +125,14 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-`tests/fixtures/`의 응답은 공식 문서의 응답 형식에 맞춰 만든 **샘플 값**입니다(실제 수치가 아닙니다). 본인 키로 실제 응답을 녹화해 교체하려면:
+`tests/fixtures/`의 DART 응답은 실제 API 응답을 녹화한 것이고(개인정보는 가명·더미 값으로 바꿈), 공공데이터포털 응답은 아직 공식 문서 형식에 맞춰 만든 **샘플 값**입니다(실제 수치가 아닙니다). 자세한 내용은 [tests/fixtures/README.md](tests/fixtures/README.md)에 있습니다. 본인 키로 실제 응답을 녹화하려면:
 
 ```bash
-uv run python scripts/record_fixtures.py
+uv run python scripts/record_fixtures.py              # 아직 녹화하지 않은 소스만
+uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만 (dart도 가능)
 ```
 
-API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화했다면 `--force` 없이는 API를 다시 호출하지 않습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다.
+API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화한 소스는 `--force` 없이는 API를 다시 호출하지 않습니다. 한 소스가 연결에 실패해도 다른 소스의 녹화는 남습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다. 녹화하면 값이 바뀌므로 `tests/test_tools.py`의 기대값도 함께 고쳐야 합니다.
 
 레포 구조:
 

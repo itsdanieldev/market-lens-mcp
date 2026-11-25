@@ -1,4 +1,7 @@
-"""도구 5개를 픽스처 응답으로 검증한다."""
+"""도구 5개를 픽스처 응답으로 검증한다.
+
+DART 픽스처는 실제 응답 녹화본이고, 공공데이터포털(fsc_*) 픽스처는 아직 샘플 값이다.
+"""
 
 from __future__ import annotations
 
@@ -55,19 +58,31 @@ async def test_resolve_ticker_with_only_dart_key(make_app):
 
 async def test_list_disclosures(app, api):
     result = await server.list_disclosures(
-        "삼성전자", start_date="2024-10-15", end_date="2024-11-14", disclosure_type="정기공시"
+        "삼성전자",
+        start_date="2026-10-26",
+        end_date="2026-11-25",
+        disclosure_type="정기공시",
+        limit=20,
     )
     assert_envelope(result)
     data = result["data"]
     assert data["corp_code"] == "00126380" and data["disclosure_type"] == "정기공시"
+    assert data["total_count"] == 41
     first = data["disclosures"][0]
-    assert first["rcept_no"] == "20241114000001" and first["date"] == "2024-11-14"
-    assert first["url"].endswith("rcpNo=20241114000001")
-    assert result["computed"] == {"returned_count": 3, "has_more": False}
+    assert first["rcept_no"] == "20261118000151" and first["date"] == "2026-11-18"
+    assert first["title"] == "임원ㆍ주요주주특정증권등소유상황보고서"
+    assert first["url"].endswith("rcpNo=20261118000151")
+    quarterly = data["disclosures"][1]
+    assert quarterly["title"] == "분기보고서 (2026.09)" and quarterly["filer"] == "삼성전자"
+    # 실제 응답은 제목 뒤에 공백이 붙어 오고, 비고(rm)에 '유', '공' 같은 표시가 온다
+    notice = data["disclosures"][2]
+    assert notice["title"] == "최대주주등소유주식변동신고서" and notice["remark"] == "유"
+    assert result["computed"] == {"returned_count": 20, "has_more": True}
+    assert api.count("list.json") == 1
     params = next(r for r in api.calls if r.url.path.endswith("list.json")).url.params
     assert (params["bgn_de"], params["end_de"], params["pblntf_ty"]) == (
-        "20241015",
-        "20241114",
+        "20261026",
+        "20261125",
         "A",
     )
 
@@ -83,15 +98,22 @@ async def test_list_disclosures_no_data_and_bad_type(app, api):
 
 
 async def test_get_disclosure_text_truncates_and_pages(app):
-    full = await server.get_disclosure_text("20241031000003", max_chars=50_000)
+    full = await server.get_disclosure_text("20261118000151", max_chars=50_000)
     text = full["data"]["text"]
-    assert "현금ㆍ현물배당 결정" in text and "1주당 배당금(원) | 100" in text
-    assert "해당 없음 & 끝." in text
-    assert "color" not in text and "<" not in text
-    assert full["data"]["truncated"] is False and full["as_of"] == "2024-10-31"
+    lines = text.split("\n")
+    assert lines[0] == "임원ㆍ주요주주 특정증권등 소유상황보고서" and lines[1] == "삼성전자"
+    # 표의 한 행이 한 줄로 나온다
+    assert "법인구분 | 유가증권상장법인 | 회사코드 | 005930 |" in lines
+    assert "직전보고서 | 2026년 01월 30일 | 1,206 | 0.00 | 1,206 | 0.00 |" in lines
+    assert "1. 발행회사에 관한 사항" in lines
+    # 서식 버전 같은 머리 정보와 태그는 남지 않는다
+    assert "6.1" not in lines and "<" not in text and "AUNITVALUE" not in text
+    assert full["data"]["total_chars"] == len(text) == 1770
+    assert full["data"]["truncated"] is False and full["as_of"] == "2026-11-18"
 
-    part = await server.get_disclosure_text("20241031000003", max_chars=500, offset=10)
+    part = await server.get_disclosure_text("20261118000151", max_chars=500, offset=10)
     assert part["data"]["text"] == text[10:510]
+    assert part["data"]["truncated"] is True and part["data"]["next_offset"] == 510
     short = document_to_text("<P>" + "가" * 2000 + "</P>")
     assert len(short) == 2000
 
@@ -124,36 +146,68 @@ async def test_get_disclosure_text_rejects_bad_number(app):
 
 
 async def test_get_financials_quarter(app):
-    result = await server.get_financials("삼성전자", 2024, 3)
+    result = await server.get_financials("삼성전자", 2025, 3)
     assert_envelope(result)
     data, computed = result["data"], result["computed"]
     assert data["statement"] == "연결재무제표" and data["period_type"] == "quarter"
-    assert data["accounts"]["revenue"]["current"] == 80_000_000_000
-    assert data["accounts"]["revenue"]["cumulative"] == 220_000_000_000
-    assert data["accounts"]["total_liabilities"]["current"] == 100_000_000_000
-    assert computed["revenue_change_pct"] == 25.0
-    assert computed["revenue_cumulative_change_pct"] == 10.0
-    assert computed["operating_income_change_pct"] == 300.0
-    assert computed["operating_margin_pct"] == 12.5
-    assert computed["debt_to_equity_pct"] == 25.0
-    assert computed["total_assets_change_pct"] == 25.0
+    assert data["currency"] == "KRW" and data["rcept_no"] == "20251114002447"
+    assert data["accounts"]["revenue"] == {
+        "label": "매출액",
+        "current": 86_061_747_000_000,
+        # 실제 응답의 기간 표기는 누적 구간(01.01 ~ 09.30)이고 금액은 3개월분이다
+        "current_period": "2025.07.01 ~ 2025.09.30",
+        "prior": 79_098_731_000_000,
+        "prior_period": "2024.07.01 ~ 2024.09.30",
+        "cumulative": 239_768_567_000_000,
+        "prior_cumulative": 225_082_634_000_000,
+    }
+    assert data["accounts"]["operating_income"]["current"] == 12_166_062_000_000
+    assert data["accounts"]["net_income"]["label"] == "당기순이익(손실)"
+    assert data["accounts"]["net_income"]["current"] == 12_225_747_000_000
+    assert data["accounts"]["total_assets"]["current"] == 523_659_586_000_000
+    assert data["accounts"]["total_assets"]["current_period"] == "2025.09.30 현재"
+    assert data["accounts"]["total_assets"]["prior_period"] == "2024.12.31 현재"
+    assert data["accounts"]["total_liabilities"]["current"] == 110_158_092_000_000
+    assert data["accounts"]["total_equity"]["current"] == 413_501_494_000_000
+    assert computed["revenue_change_pct"] == 8.8
+    assert computed["revenue_cumulative_change_pct"] == 6.52
+    assert computed["operating_income_change_pct"] == 32.48
+    assert computed["operating_income_cumulative_change_pct"] == -10.31
+    assert computed["net_income_change_pct"] == 21.04
+    assert computed["operating_margin_pct"] == 14.14
+    assert computed["net_margin_pct"] == 14.21
+    assert computed["debt_to_equity_pct"] == 26.64
+    assert computed["total_assets_change_pct"] == 1.77
+    assert computed["total_liabilities_change_pct"] == -1.94
+    assert result["warnings"] == []
+    assert result["as_of"] == "2025-09-30"
+
+
+async def test_get_financials_skips_change_when_prior_is_a_loss(app, api):
+    payload = json.loads((FIXTURES / "dart_financials.json").read_text(encoding="utf-8"))
+    for row in payload["list"]:
+        if row["account_nm"].startswith("당기순이익"):
+            row["frmtrm_amount"] = "-1,000,000"
+    api.overrides["fnlttSinglAcnt"] = httpx.Response(200, json=payload)
+    result = await server.get_financials("삼성전자", 2025, 3)
     # 전년 동기가 적자면 증감률을 내지 않는다
-    assert computed["net_income_change_pct"] is None
+    assert result["computed"]["net_income_change_pct"] is None
+    assert result["computed"]["revenue_change_pct"] == 8.8
     assert any("0 이하" in w for w in result["warnings"])
-    assert result["as_of"] == "2024-09-30"
 
 
 async def test_get_financials_falls_back_to_separate_and_missing(app, api):
     payload = json.loads((FIXTURES / "dart_financials.json").read_text(encoding="utf-8"))
     payload["list"] = [r for r in payload["list"] if r["fs_div"] == "OFS"]
     api.overrides["fnlttSinglAcnt"] = httpx.Response(200, json=payload)
-    result = await server.get_financials("005930", 2024, 3)
+    result = await server.get_financials("005930", 2025, 3)
     assert result["data"]["statement"] == "재무제표"
+    assert result["data"]["accounts"]["revenue"]["current"] == 62_799_068_000_000
     assert any("별도" in w for w in result["warnings"])
 
     api.overrides["fnlttSinglAcnt"] = httpx.Response(200, json={"status": "013", "message": "-"})
     with pytest.raises(NotFoundError):
-        await server.get_financials("005930", 2025, 1)
+        await server.get_financials("005930", 2027, 1)
 
 
 async def test_get_stock_prices(app, api):
@@ -189,7 +243,7 @@ async def test_prices_are_cached_for_the_day(app, api):
 async def test_missing_keys(make_app):
     make_app(dart_key=None, fsc_key=None)
     with pytest.raises(MissingKeyError, match="DART_API_KEY"):
-        await server.get_financials("005930", 2024, 3)
+        await server.get_financials("005930", 2025, 3)
     with pytest.raises(MissingKeyError, match="DATA_GO_KR_KEY"):
         await server.get_stock_prices("005930")
 
@@ -216,7 +270,7 @@ async def test_source_errors_do_not_leak_keys(app, api):
     api.overrides["corpCode"] = httpx.Response(503)
     server.get_app().cache.set("dart:corp_index", None, -1)
     with pytest.raises(SourceError, match="HTTP 503") as http_error:
-        await server.get_financials("005930", 2024, 3)
+        await server.get_financials("005930", 2025, 3)
     assert api.count("corpCode") == 4  # 처음 1번 + 재시도 3번
     for error in (dart_error, fsc_error, http_error):
         assert "test-dart-key" not in str(error.value)
@@ -227,8 +281,8 @@ async def test_no_solicitation_wording_in_structured_output(app):
     """본문 텍스트를 뺀 도구 응답에 투자 권유 표현이 섞이지 않는다."""
     outputs = [
         await server.resolve_ticker("삼성전자"),
-        await server.list_disclosures("삼성전자"),
-        await server.get_financials("삼성전자", 2024, 3),
+        await server.list_disclosures("삼성전자", limit=20),
+        await server.get_financials("삼성전자", 2025, 3),
         await server.get_stock_prices("삼성전자", "2024-11-08", "2024-11-14"),
     ]
     blob = json.dumps(outputs, ensure_ascii=False)
@@ -250,7 +304,7 @@ async def test_tools_are_registered_with_mcp():
 
 async def test_request_urls_with_keys_are_not_logged(app, caplog):
     with caplog.at_level(logging.INFO):
-        await server.list_disclosures("005930")
+        await server.list_disclosures("005930", limit=20)
     assert "test-dart-key" not in caplog.text
 
 
