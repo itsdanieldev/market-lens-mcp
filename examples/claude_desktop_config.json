@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kr-invest": {
+      "command": "uv",
+      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "kr-invest-mcp"]
+    }
+  }
+}

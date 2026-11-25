@@ -1,0 +1,53 @@
+{
+ "response": {
+  "header": {
+   "resultCode": "00",
+   "resultMsg": "NORMAL SERVICE."
+  },
+  "body": {
+   "numOfRows": 1000,
+   "pageNo": 1,
+   "totalCount": 4,
+   "items": {
+    "item": [
+     {
+      "basDt": "20241113",
+      "srtnCd": "A005930",
+      "isinCd": "KR7005930003",
+      "mrktCtg": "KOSPI",
+      "itmsNm": "삼성전자",
+      "crno": "1301110006246",
+      "corpNm": "삼성전자(주)"
+     },
+     {
+      "basDt": "20241113",
+      "srtnCd": "A005935",
+      "isinCd": "KR7005931001",
+      "mrktCtg": "KOSPI",
+      "itmsNm": "삼성전자우",
+      "crno": "1301110006246",
+      "corpNm": "삼성전자(주)"
+     },
+     {
+      "basDt": "20241114",
+      "srtnCd": "A005930",
+      "isinCd": "KR7005930003",
+      "mrktCtg": "KOSPI",
+      "itmsNm": "삼성전자",
+      "crno": "1301110006246",
+      "corpNm": "삼성전자(주)"
+     },
+     {
+      "basDt": "20241114",
+      "srtnCd": "A005935",
+      "isinCd": "KR7005931001",
+      "mrktCtg": "KOSPI",
+      "itmsNm": "삼성전자우",
+      "crno": "1301110006246",
+      "corpNm": "삼성전자(주)"
+     }
+    ]
+   }
+  }
+ }
+}

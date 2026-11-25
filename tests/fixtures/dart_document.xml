@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DOCUMENT>
+<DOCUMENT-NAME ACODE="00000">샘플공시</DOCUMENT-NAME>
+<BODY>
+<STYLE>.x { color: red; }</STYLE>
+<TITLE ATOC="Y">현금ㆍ현물배당 결정</TITLE>
+<P>이 문서는 테스트용 샘플이며 실제 공시가 아닙니다.</P>
+<TABLE>
+<TBODY>
+<TR><TD>1. 배당구분</TD><TD>분기배당</TD></TR>
+<TR><TD>2. 1주당 배당금(원)</TD><TD>100</TD></TR>
+<TR><TD>3. 배당기준일</TD><TD>2024-09-30</TD></TR>
+</TBODY>
+</TABLE>
+<P>기타 투자판단과 관련한 중요사항:&nbsp;해당 없음 &amp; 끝.</P>
+</BODY>
+</DOCUMENT>
