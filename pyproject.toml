@@ -1,6 +1,6 @@
 [project]
 name = "market-lens-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "한국 주식 리서치용 MCP 서버 (DART 공시·재무, 금융위원회 시세)"
 readme = "README.md"
 license = { text = "MIT" }
