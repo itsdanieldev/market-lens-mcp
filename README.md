@@ -5,7 +5,7 @@
 
 한국 주식 리서치용 MCP 서버입니다. Claude Desktop 같은 MCP 클라이언트에 붙이면 상장사의 공시, 재무제표, 주가를 공식 API에서 가져와 출처와 기준일이 붙은 답을 만들 수 있습니다.
 
-투자 권유 도구가 아닙니다. [DISCLAIMER.md](DISCLAIMER.md)를 먼저 읽어 주세요.
+투자 권유 도구가 아닙니다. [DISCLAIMER.md](https://github.com/itsdanieldev/market-lens-mcp/blob/main/DISCLAIMER.md)를 먼저 읽어 주세요.
 
 ## 도구
 
@@ -221,7 +221,7 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-`tests/fixtures/`의 DART 응답은 실제 API 응답을 녹화한 것입니다(개인정보는 가명·더미 값으로 바꿈). 공공데이터포털 응답은 실제 응답과 같은 구조에 지어낸 값을 넣은 샘플입니다. 포털의 이용허락범위가 데이터 재배포를 금지하기 때문입니다. 자세한 내용은 [tests/fixtures/README.md](tests/fixtures/README.md)에 있습니다. 본인 키로 실제 응답을 받아 보려면:
+`tests/fixtures/`의 DART 응답은 실제 API 응답을 녹화한 것입니다(개인정보는 가명·더미 값으로 바꿈). 공공데이터포털 응답은 실제 응답과 같은 구조에 지어낸 값을 넣은 샘플입니다. 포털의 이용허락범위가 데이터 재배포를 금지하기 때문입니다. 자세한 내용은 [tests/fixtures/README.md](https://github.com/itsdanieldev/market-lens-mcp/blob/main/tests/fixtures/README.md)에 있습니다. 본인 키로 실제 응답을 받아 보려면:
 
 ```bash
 uv run python scripts/record_fixtures.py              # 아직 녹화하지 않은 소스만
@@ -255,4 +255,4 @@ tests/                      # 픽스처로 도는 테스트
 
 ## 라이선스
 
-[MIT](LICENSE)
+[MIT](https://github.com/itsdanieldev/market-lens-mcp/blob/main/LICENSE)
