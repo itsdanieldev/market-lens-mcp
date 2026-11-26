@@ -2,7 +2,9 @@
 
 - 주식시세정보: https://www.data.go.kr/data/15094808/openapi.do
 - KRX상장종목정보: https://www.data.go.kr/data/15094775/openapi.do
-시세는 전 영업일 종가 기준으로 하루 늦게 갱신된다.
+두 API 모두 V2 주소를 쓴다(서비스 이름과 기능 이름 끝에 _V2). 옛 주소(/service/...)로 부르면
+키가 맞아도 HTTP 403 SERVICE_KEY_IS_NOT_REGISTERED_ERROR가 돌아온다.
+시세는 전 영업일 종가 기준으로 하루 늦게(영업일 다음 날 오후 1시 이후) 갱신된다.
 """
 
 from __future__ import annotations
@@ -16,9 +18,9 @@ from ..errors import SourceError
 from ..util import now_kst, ymd
 from ._base import BaseSource, Fetched
 
-BASE_URL = "https://apis.data.go.kr/1160100/service"
-PRICE_URL = f"{BASE_URL}/GetStockSecuritiesInfoService/getStockPriceInfo"
-ITEM_URL = f"{BASE_URL}/GetKrxListedInfoService/getItemInfo"
+BASE_URL = "https://apis.data.go.kr/1160100"
+PRICE_URL = f"{BASE_URL}/GetStockSecuritiesInfoService_V2/getStockPriceInfo_V2"
+ITEM_URL = f"{BASE_URL}/GetKrxListedInfoService_V2/getItemInfo_V2"
 SOURCE_PRICES = "공공데이터포털 금융위원회_주식시세정보"
 SOURCE_ITEMS = "공공데이터포털 금융위원회_KRX상장종목정보"
 

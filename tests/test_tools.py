@@ -320,7 +320,7 @@ async def test_get_stock_prices(app, api):
     assert computed["trading_days"] == 5 and computed["average_volume"] == 1_500_000
     assert computed["period_high"] == 56000 and computed["period_low_date"] == "2024-11-08"
     assert result["as_of"] == "2024-11-14" and result["source"].endswith("주식시세정보")
-    params = next(r for r in api.calls if r.url.path.endswith("getStockPriceInfo")).url.params
+    params = next(r for r in api.calls if r.url.path.endswith("/getStockPriceInfo_V2")).url.params
     # endBasDt는 미만 조건이라 하루 뒤를 보낸다
     assert (params["beginBasDt"], params["endBasDt"]) == ("20241108", "20241115")
 

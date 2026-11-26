@@ -204,6 +204,7 @@ def record_fsc(http: httpx.Client, settings: Settings, today: date) -> Files:
         "serviceKey": settings.data_go_kr_key,
         "resultType": "json",
         "numOfRows": MAX_ROWS,
+        "pageNo": 1,
     }
     items = fsc_json(
         "fsc_items.json",

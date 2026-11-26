@@ -62,9 +62,9 @@ class FakeApi:
         if path.endswith("/fnlttSinglAcnt.json"):
             name = FINANCIAL_FIXTURES[params["reprt_code"]]
             return httpx.Response(200, content=(FIXTURES / name).read_bytes())
-        if path.endswith("/getItemInfo"):
+        if path.endswith("/getItemInfo_V2"):
             return httpx.Response(200, content=(FIXTURES / "fsc_items.json").read_bytes())
-        if path.endswith("/getStockPriceInfo"):
+        if path.endswith("/getStockPriceInfo_V2"):
             return httpx.Response(200, content=(FIXTURES / "fsc_prices.json").read_bytes())
         return httpx.Response(404, text="not found")
 
