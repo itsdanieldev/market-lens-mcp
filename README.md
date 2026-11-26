@@ -166,9 +166,11 @@ API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 �
 
 ```
 src/market_lens/
-├── server.py        # MCP 서버 진입점, 도구 5개
-├── sources/dart.py  # DART 공시, 재무, 고유번호
-├── sources/fsc.py   # 금융위원회 주식시세, 상장종목
+├── server.py        # MCP 서버 진입점: 도구 5개의 이름, 인자, 설명
+├── app.py           # 설정·캐시·HTTP·소스 클라이언트 조립
+├── services/        # 도구별 처리: tickers, disclosures, financials, prices
+├── sources/dart.py  # DART 공시, 재무, 고유번호 (원본 응답 해석)
+├── sources/fsc.py   # 금융위원회 주식시세, 상장종목 (원본 응답 해석)
 ├── sources/_base.py # 재시도, 캐시, 키가 새지 않는 오류 처리
 ├── analytics.py     # 수익률·증감률 계산
 ├── cache.py         # SQLite TTL 캐시

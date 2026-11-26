@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from market_lens import server
+from market_lens.app import App, set_app
 from market_lens.cache import Cache
 from market_lens.config import Settings
 from market_lens.sources import _base
@@ -79,21 +79,21 @@ def make_app(api, tmp_path, monkeypatch):
     monkeypatch.setattr(_base, "RETRY_DELAY", 0)
     created = []
 
-    def factory(dart_key: str | None = DART_KEY, fsc_key: str | None = FSC_KEY) -> server.App:
+    def factory(dart_key: str | None = DART_KEY, fsc_key: str | None = FSC_KEY) -> App:
         settings = Settings(dart_key, fsc_key, tmp_path / "cache.sqlite3")
-        app = server.App(
+        app = App(
             settings,
             http=httpx.AsyncClient(transport=httpx.MockTransport(api)),
             cache=Cache(":memory:"),
         )
-        server.set_app(app)
+        set_app(app)
         created.append(app)
         return app
 
     yield factory
-    server.set_app(None)
+    set_app(None)
 
 
 @pytest.fixture
-def app(make_app) -> server.App:
+def app(make_app) -> App:
     return make_app()

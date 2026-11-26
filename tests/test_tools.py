@@ -14,7 +14,9 @@ import pytest
 from mcp import Client
 
 from market_lens import server
+from market_lens.app import get_app
 from market_lens.errors import MissingKeyError, NotFoundError, SourceError
+from market_lens.services.financials import three_months
 from market_lens.sources.dart import document_to_text
 
 from .conftest import FIXTURES
@@ -202,11 +204,11 @@ def test_document_to_text_handles_html_style_markup():
 
 
 def test_quarter_income_period_is_narrowed_to_three_months():
-    assert server._three_months("2025.01.01 ~ 2025.09.30") == "2025.07.01 ~ 2025.09.30"
-    assert server._three_months("2025.01.01 ~ 2025.03.31") == "2025.01.01 ~ 2025.03.31"
-    assert server._three_months("2024.10.01 ~ 2025.01.31") == "2024.11.01 ~ 2025.01.31"
-    assert server._three_months("2025.09.30 현재") == "2025.09.30 현재"
-    assert server._three_months(None) is None
+    assert three_months("2025.01.01 ~ 2025.09.30") == "2025.07.01 ~ 2025.09.30"
+    assert three_months("2025.01.01 ~ 2025.03.31") == "2025.01.01 ~ 2025.03.31"
+    assert three_months("2024.10.01 ~ 2025.01.31") == "2024.11.01 ~ 2025.01.31"
+    assert three_months("2025.09.30 현재") == "2025.09.30 현재"
+    assert three_months(None) is None
 
 
 async def test_get_disclosure_text_rejects_bad_number(app):
@@ -439,7 +441,7 @@ async def test_source_errors_do_not_leak_keys(app, api):
     with pytest.raises(SourceError, match="SERVICE_KEY_IS_NOT_REGISTERED_ERROR"):
         await server.get_stock_prices("005930")
     api.overrides["corpCode"] = httpx.Response(503)
-    server.get_app().cache.set("dart:corp_index", None, -1)
+    get_app().cache.set("dart:corp_index", None, -1)
     with pytest.raises(SourceError, match="HTTP 503") as http_error:
         await server.get_financials("005930", 2025, 3)
     assert api.count("corpCode") == 4  # 처음 1번 + 재시도 3번
