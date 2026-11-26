@@ -3,6 +3,8 @@
 [![PyPI](https://img.shields.io/pypi/v/market-lens-mcp)](https://pypi.org/project/market-lens-mcp/)
 [![CI](https://github.com/itsdanieldev/market-lens-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/itsdanieldev/market-lens-mcp/actions/workflows/ci.yml)
 
+한국어 | [English](https://github.com/itsdanieldev/market-lens-mcp/blob/main/README.en.md)
+
 한국 주식 리서치용 MCP 서버입니다. Claude Desktop 같은 MCP 클라이언트에 붙이면 상장사의 공시, 재무제표, 주가를 공식 API에서 가져와 출처와 기준일이 붙은 답을 만들 수 있습니다.
 
 투자 권유 도구가 아닙니다. [DISCLAIMER.md](https://github.com/itsdanieldev/market-lens-mcp/blob/main/DISCLAIMER.md)를 먼저 읽어 주세요.
