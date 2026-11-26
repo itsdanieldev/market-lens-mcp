@@ -63,6 +63,8 @@ cp .env.example .env   # 키 두 개를 채웁니다
 
 승인 직후에는 키가 반영될 때까지 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 날 수 있습니다. 잠시 뒤 다시 시도하세요.
 
+두 API는 포털의 V2 주소(`GetStockSecuritiesInfoService_V2/getStockPriceInfo_V2`, `GetKrxListedInfoService_V2/getItemInfo_V2`)로 호출합니다. V2 이전 주소는 키가 맞아도 같은 오류를 돌려줍니다.
+
 키가 하나만 있어도 일부 도구는 동작합니다. 공시·재무 도구는 DART 키만, `get_stock_prices`는 공공데이터포털 키만 있으면 됩니다.
 
 ## Claude Desktop 설정
@@ -109,7 +111,8 @@ claude mcp add market-lens -- uv --directory /절대/경로/market-lens-mcp run 
 
 ## 알아둘 점
 
-- 주가는 전 영업일 종가까지 제공됩니다. 실시간 시세가 아닙니다.
+- 주가는 전 영업일 종가까지 제공됩니다. 실시간 시세가 아닙니다. 포털은 영업일 다음 날 오후 1시 이후에 자료를 올립니다(금요일 자료는 다음 월요일).
+- KRX상장종목정보는 우선주를 제공하지 않습니다. `resolve_ticker`의 ISIN과 시장 구분은 보통주만 채워집니다.
 - 주가는 수정주가가 아닙니다. 액면분할이나 증자가 낀 기간의 수익률은 왜곡됩니다.
 - `get_financials`의 분기(1~3) 손익 값은 3개월 금액이고, `quarter=4`는 사업보고서의 연간 금액입니다.
 - 분기 손익의 `current_period`는 그 3개월 구간입니다. DART 원본은 누적 구간(예: 01.01 ~ 09.30)으로 표기하므로 서버가 금액에 맞게 바꿔서 돌려줍니다.
@@ -126,14 +129,14 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-`tests/fixtures/`의 DART 응답은 실제 API 응답을 녹화한 것이고(개인정보는 가명·더미 값으로 바꿈), 공공데이터포털 응답은 아직 공식 문서 형식에 맞춰 만든 **샘플 값**입니다(실제 수치가 아닙니다). 자세한 내용은 [tests/fixtures/README.md](tests/fixtures/README.md)에 있습니다. 본인 키로 실제 응답을 녹화하려면:
+`tests/fixtures/`의 DART 응답은 실제 API 응답을 녹화한 것입니다(개인정보는 가명·더미 값으로 바꿈). 공공데이터포털 응답은 실제 응답과 같은 구조에 지어낸 값을 넣은 샘플입니다. 포털의 이용허락범위가 데이터 재배포를 금지하기 때문입니다. 자세한 내용은 [tests/fixtures/README.md](tests/fixtures/README.md)에 있습니다. 본인 키로 실제 응답을 받아 보려면:
 
 ```bash
 uv run python scripts/record_fixtures.py              # 아직 녹화하지 않은 소스만
 uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만 (dart, dart_reports도 가능)
 ```
 
-API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화한 소스는 `--force` 없이는 API를 다시 호출하지 않습니다. 한 소스가 연결에 실패해도 다른 소스의 녹화는 남습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다. 녹화하면 값이 바뀌므로 `tests/test_tools.py`의 기대값도 함께 고쳐야 합니다.
+API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화한 소스는 `--force` 없이는 API를 다시 호출하지 않습니다. 한 소스가 연결에 실패해도 다른 소스의 녹화는 남습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다. 녹화하면 값이 바뀌므로 `tests/test_tools.py`의 기대값도 함께 고쳐야 합니다. 공공데이터포털(`fsc`) 녹화 결과는 커밋하지 마세요.
 
 레포 구조:
 
