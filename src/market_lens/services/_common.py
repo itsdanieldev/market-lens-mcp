@@ -11,6 +11,21 @@ from ..sources.dart import DartClient
 from ..util import iso_kst
 
 
+def citation(source: str, as_of: str) -> str:
+    """답변에 그대로 옮겨 적을 인용 문구를 만든다.
+
+    출처와 기준일을 모델이 직접 조합하게 두면 한쪽을 빠뜨리기 쉬워 완성된 문장으로 준다.
+
+    Args:
+        source: 데이터 출처 이름.
+        as_of: 데이터 기준일 또는 기준 시각.
+
+    Returns:
+        '출처: … · 기준일: …' 형식의 문구.
+    """
+    return f"출처: {source} · 기준일: {as_of}"
+
+
 def envelope(
     source: str,
     as_of: str,
@@ -30,12 +45,13 @@ def envelope(
         warnings: 주의 사항.
 
     Returns:
-        Envelope를 dict로 바꾼 값. fetched_at은 조회 가운데 가장 이른 시각이고,
+        Envelope를 dict로 바꾼 값. citation은 source와 as_of로 만들고, fetched_at은 조회 가운데 가장 이른 시각이고,
         cached는 모든 조회가 캐시였을 때만 True다.
     """
     return Envelope(
         source=source,
         as_of=as_of,
+        citation=citation(source, as_of),
         fetched_at=iso_kst(min(f.fetched_at for f in fetched)),
         cached=all(f.cached for f in fetched),
         data=data,

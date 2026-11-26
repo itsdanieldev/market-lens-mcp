@@ -18,6 +18,7 @@ class Envelope(BaseModel):
     Attributes:
         source: 데이터 출처(공식 API 이름).
         as_of: 데이터 기준일 또는 기준 시각(KST).
+        citation: source와 as_of를 합친 인용 문구. 모델이 답변 끝에 그대로 옮겨 적는다.
         fetched_at: API에서 실제로 받아 온 시각(KST).
         cached: 캐시에서 읽었는지 여부.
         data: 도구별 결과.
@@ -28,6 +29,7 @@ class Envelope(BaseModel):
 
     source: str = Field(description="데이터 출처(공식 API 이름)")
     as_of: str = Field(description="데이터 기준일 또는 기준 시각(KST)")
+    citation: str = Field(description="답변 끝에 그대로 적을 출처·기준일 문구")
     fetched_at: str = Field(description="API에서 실제로 받아 온 시각(KST)")
     cached: bool = Field(description="캐시에서 읽었는지 여부")
     data: Any

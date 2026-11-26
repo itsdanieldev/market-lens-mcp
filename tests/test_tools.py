@@ -21,7 +21,7 @@ from market_lens.sources.dart import document_to_text
 
 from .conftest import FIXTURES
 
-ENVELOPE_KEYS = {"source", "as_of", "fetched_at", "cached", "data", "disclaimer"}
+ENVELOPE_KEYS = {"source", "as_of", "citation", "fetched_at", "cached", "data", "disclaimer"}
 
 
 def assert_envelope(result: dict) -> None:
@@ -32,6 +32,7 @@ def assert_envelope(result: dict) -> None:
     """
     assert result.keys() >= ENVELOPE_KEYS
     assert result["source"] and result["as_of"]
+    assert result["citation"] == f"출처: {result['source']} · 기준일: {result['as_of']}"
 
 
 async def test_resolve_ticker_by_name(app):
@@ -489,6 +490,31 @@ async def test_no_solicitation_wording_in_structured_output(app):
     blob = json.dumps(outputs, ensure_ascii=False)
     for word in ("매수", "매도", "목표가", "추천"):
         assert word not in blob
+
+
+async def test_every_tool_response_carries_a_citation(app):
+    """도구 5개의 응답 모두에 출처와 기준일을 합친 인용 문구가 들어 있다."""
+    results = [
+        await server.resolve_ticker("삼성전자"),
+        await server.list_disclosures("삼성전자", limit=20),
+        await server.get_disclosure_text("20261118000151"),
+        await server.get_financials("삼성전자", 2025, 3),
+        await server.get_stock_prices("삼성전자", "2024-11-08", "2024-11-14"),
+    ]
+    for result in results:
+        assert_envelope(result)
+    assert results[3]["citation"] == (
+        "출처: DART OpenAPI (금융감독원 전자공시시스템) · 기준일: 2025-09-30"
+    )
+    assert results[4]["citation"] == (
+        "출처: 공공데이터포털 금융위원회_주식시세정보 · 기준일: 2024-11-14"
+    )
+
+
+async def test_tool_descriptions_ask_for_the_citation():
+    """모델이 읽는 도구 설명마다 인용 문구를 답변에 적으라는 지시가 있다."""
+    for tool in await server.mcp.list_tools():
+        assert "citation" in tool.description, tool.name
 
 
 async def test_tools_are_registered_with_mcp():
