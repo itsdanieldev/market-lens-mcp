@@ -26,7 +26,8 @@ class MissingKeyError(MarketLensError):
             where: 키를 발급받는 주소.
         """
         super().__init__(
-            f"{env_name} 환경변수가 없습니다. {where}에서 키를 발급받아 .env에 넣어 주세요."
+            f"{env_name} 환경변수가 없습니다. {where}에서 키를 발급받아 "
+            "MCP 클라이언트 설정의 env나 .env 파일에 넣어 주세요."
         )
 
 
