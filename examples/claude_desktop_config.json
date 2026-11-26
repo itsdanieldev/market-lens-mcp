@@ -2,7 +2,11 @@
   "mcpServers": {
     "market-lens": {
       "command": "uv",
-      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "market-lens-mcp"]
+      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "market-lens-mcp"],
+      "env": {
+        "DART_API_KEY": "발급받은_40자리_키",
+        "DATA_GO_KR_KEY": "발급받은_일반_인증키"
+      }
     }
   }
 }
