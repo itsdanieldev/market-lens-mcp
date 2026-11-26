@@ -5,9 +5,9 @@
    "resultMsg": "NORMAL SERVICE."
   },
   "body": {
-   "numOfRows": 1000,
+   "numOfRows": 20,
    "pageNo": 1,
-   "totalCount": 6,
+   "totalCount": 5,
    "items": {
     "item": [
      {
@@ -24,25 +24,8 @@
       "lopr": "53000",
       "trqu": "1800000",
       "trPrc": "99000000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "328338040250000"
-     },
-     {
-      "basDt": "20241114",
-      "srtnCd": "0059301",
-      "isinCd": "KR7005930003",
-      "itmsNm": "다른종목",
-      "mrktCtg": "KOSPI",
-      "clpr": "55000",
-      "vs": "1500",
-      "fltRt": "2.8",
-      "mkp": "53500",
-      "hipr": "56000",
-      "lopr": "53000",
-      "trqu": "1800000",
-      "trPrc": "99000000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "328338040250000"
+      "lstgStCnt": "6000000000",
+      "mrktTotAmt": "330000000000000"
      },
      {
       "basDt": "20241113",
@@ -58,8 +41,8 @@
       "lopr": "51000",
       "trqu": "2000000",
       "trPrc": "107000000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "319383366425000"
+      "lstgStCnt": "6000000000",
+      "mrktTotAmt": "321000000000000"
      },
      {
       "basDt": "20241112",
@@ -75,8 +58,8 @@
       "lopr": "51000",
       "trqu": "1200000",
       "trPrc": "61200000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "304458910050000"
+      "lstgStCnt": "6000000000",
+      "mrktTotAmt": "306000000000000"
      },
      {
       "basDt": "20241111",
@@ -92,8 +75,8 @@
       "lopr": "50000",
       "trqu": "1500000",
       "trPrc": "78000000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "310428692600000"
+      "lstgStCnt": "6000000000",
+      "mrktTotAmt": "312000000000000"
      },
      {
       "basDt": "20241108",
@@ -102,15 +85,15 @@
       "itmsNm": "삼성전자",
       "mrktCtg": "KOSPI",
       "clpr": "50000",
-      "vs": "0",
-      "fltRt": "0",
+      "vs": "-400",
+      "fltRt": "-.79",
       "mkp": "50000",
       "hipr": "51000",
       "lopr": "49500",
       "trqu": "1000000",
       "trPrc": "50000000000",
-      "lstgStCnt": "5969782550",
-      "mrktTotAmt": "298489127500000"
+      "lstgStCnt": "6000000000",
+      "mrktTotAmt": "300000000000000"
      }
     ]
    }

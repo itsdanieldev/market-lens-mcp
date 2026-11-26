@@ -1,6 +1,7 @@
 """도구 5개를 픽스처 응답으로 검증한다.
 
-DART 픽스처는 실제 응답 녹화본이고, 공공데이터포털(fsc_*) 픽스처는 아직 샘플 값이다.
+DART 픽스처는 실제 응답 녹화본이다. 공공데이터포털(fsc_*) 픽스처는 실제 응답과 같은 구조에
+지어낸 값을 넣은 샘플이다(이유는 tests/fixtures/README.md).
 """
 
 from __future__ import annotations
@@ -36,16 +37,52 @@ async def test_resolve_ticker_by_name(app):
         "corp_code": "00126380",
         "market": "KOSPI",
     }
-    assert [c["short_code"] for c in result["data"]["candidates"]] == ["005930", "005935"]
+    # 실제 응답처럼 같은 종목이 기준일마다 한 줄씩(최신순) 오고, 그중 최신 기준일 한 건만 남긴다
+    assert result["data"]["candidates"] == []
     assert "KRX상장종목정보" in result["source"] and "DART" in result["source"]
     assert result["as_of"] == "2024-11-14"
+    assert result["warnings"] == []
 
 
-async def test_resolve_ticker_by_code_and_no_dart_mapping(app):
+async def test_resolve_ticker_by_code(app, api):
+    result = await server.resolve_ticker("005930")
+    assert result["data"]["match"]["name"] == "삼성전자"
+    assert result["data"]["match"]["isin"] == "KR7005930003"
+    params = next(r for r in api.calls if r.url.path.endswith("/getItemInfo_V2")).url.params
+    assert params["likeSrtnCd"] == "005930" and "likeItmsNm" not in params
+
+
+def items_with_extra_listing() -> dict:
+    """샘플에 DART 고유번호가 없는 종목 한 줄을 덧붙인다.
+
+    실제 KRX상장종목정보는 우선주를 주지 않아 샘플에도 삼성전자 보통주만 있다.
+    여러 종목이 걸리는 경우와 고유번호가 없는 경우를 보려고 지어낸 한 줄을 더한다.
+    """
+    payload = json.loads((FIXTURES / "fsc_items.json").read_text(encoding="utf-8"))
+    rows = payload["response"]["body"]["items"]["item"]
+    rows.append({**rows[0], "srtnCd": "A005935", "isinCd": "KR7005931001", "itmsNm": "삼성전자우"})
+    payload["response"]["body"]["totalCount"] = len(rows)
+    return payload
+
+
+async def test_resolve_ticker_candidates_and_no_dart_mapping(app, api):
+    api.overrides["getItemInfo"] = httpx.Response(200, json=items_with_extra_listing())
+    by_code = await server.resolve_ticker("005935")
+    assert by_code["data"]["match"]["name"] == "삼성전자우"
+    assert by_code["data"]["match"]["corp_code"] is None
+    assert any("고유번호" in w for w in by_code["warnings"])
+    by_name = await server.resolve_ticker("삼성전자")
+    assert by_name["data"]["match"]["short_code"] == "005930"
+    assert [c["short_code"] for c in by_name["data"]["candidates"]] == ["005930", "005935"]
+
+
+async def test_resolve_ticker_without_listing(app, api):
+    payload = json.loads((FIXTURES / "fsc_items.json").read_text(encoding="utf-8"))
+    payload["response"]["body"].update(totalCount=0, items="")
+    api.overrides["getItemInfo"] = httpx.Response(200, json=payload)
     result = await server.resolve_ticker("005935")
-    assert result["data"]["match"]["name"] == "삼성전자우"
-    assert result["data"]["match"]["corp_code"] is None
-    assert any("고유번호" in w for w in result["warnings"])
+    assert result["data"]["match"] is None and result["data"]["candidates"] == []
+    assert any("일치하는 상장 종목이 없습니다" in w for w in result["warnings"])
 
 
 async def test_resolve_ticker_with_only_dart_key(make_app):
@@ -306,23 +343,49 @@ async def test_get_financials_falls_back_to_separate_and_missing(app, api):
 async def test_get_stock_prices(app, api):
     result = await server.get_stock_prices("삼성전자", "2024-11-08", "2024-11-14")
     assert_envelope(result)
-    prices = result["data"]["prices"]
+    data = result["data"]
+    assert (data["short_code"], data["name"]) == ("005930", "삼성전자")
+    assert (data["isin"], data["market"]) == ("KR7005930003", "KOSPI")
+    prices = data["prices"]
+    # 실제 응답처럼 최신순으로 오고, 도구는 날짜 오름차순으로 돌려준다
     assert [p["date"] for p in prices] == [
         "2024-11-08", "2024-11-11", "2024-11-12", "2024-11-13", "2024-11-14",
     ]  # fmt: skip
     assert prices[-1] == {
         "date": "2024-11-14", "open": 53500, "high": 56000, "low": 53000, "close": 55000,
         "volume": 1800000, "trading_value": 99000000000, "change": 1500, "change_pct": 2.8,
-        "market_cap": 328338040250000,
+        "market_cap": 330000000000000,
     }  # fmt: skip
+    # 실제 응답의 등락률은 '-.79'처럼 앞자리 0 없이 온다
+    assert prices[0]["change_pct"] == -0.79
     computed = result["computed"]
+    assert (computed["start_close"], computed["end_close"]) == (50000, 55000)
+    # (55000 - 50000) / 50000 = 10%
     assert computed["period_return_pct"] == 10.0
+    # 닷새 거래량 합 7,500,000주 / 5
     assert computed["trading_days"] == 5 and computed["average_volume"] == 1_500_000
-    assert computed["period_high"] == 56000 and computed["period_low_date"] == "2024-11-08"
+    assert (computed["period_high"], computed["period_high_date"]) == (56000, "2024-11-14")
+    assert (computed["period_low"], computed["period_low_date"]) == (49500, "2024-11-08")
+    # 일간 수익률 4개(4%, -1.92%, 4.9%, 2.8%)의 표본 표준편차
+    assert computed["daily_return_stdev_pct"] == 3.04
     assert result["as_of"] == "2024-11-14" and result["source"].endswith("주식시세정보")
     params = next(r for r in api.calls if r.url.path.endswith("/getStockPriceInfo_V2")).url.params
     # endBasDt는 미만 조건이라 하루 뒤를 보낸다
     assert (params["beginBasDt"], params["endBasDt"]) == ("20241108", "20241115")
+    assert (params["likeSrtnCd"], params["resultType"]) == ("005930", "json")
+
+
+async def test_get_stock_prices_drops_other_codes(app, api):
+    """likeSrtnCd는 부분 일치라 다른 종목이 섞일 수 있다. 코드가 정확히 같은 행만 쓴다."""
+    payload = json.loads((FIXTURES / "fsc_prices.json").read_text(encoding="utf-8"))
+    rows = payload["response"]["body"]["items"]["item"]
+    rows.append({**rows[0], "srtnCd": "0059301", "itmsNm": "다른종목", "clpr": "1"})
+    payload["response"]["body"]["totalCount"] = len(rows)
+    api.overrides["getStockPriceInfo"] = httpx.Response(200, json=payload)
+    result = await server.get_stock_prices("005930", "2024-11-08", "2024-11-14")
+    assert result["computed"]["trading_days"] == 5
+    assert result["computed"]["end_close"] == 55000
+    assert result["data"]["name"] == "삼성전자"
 
 
 async def test_prices_are_cached_for_the_day(app, api):

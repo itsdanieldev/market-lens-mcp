@@ -18,6 +18,8 @@ API별로 최대 20건만 한 번 받아 파일로 저장하고, 이후 테스�
 실패한 소스는 파일을 건드리지 않으며, 같은 실행 안에서 다시 시도하지도 않는다.
 
 주의: 값이 실제 수치로 바뀌므로 tests/test_tools.py의 기대값도 함께 고쳐야 한다.
+공공데이터포털(fsc)은 이용허락범위가 재배포를 금지하므로 녹화 결과를 커밋하지 않는다.
+저장소의 fsc_* 파일은 실제 응답 구조에 지어낸 값을 넣은 샘플이다.
 """
 
 from __future__ import annotations
@@ -292,6 +294,8 @@ def main() -> int:
             for filename, content in files.items():
                 (FIXTURES / filename).write_bytes(content)
                 print(f"[{name}] 저장: {filename}")
+            if name == "fsc":
+                print("[fsc] 실제 시세는 재배포할 수 없습니다. 이 파일들은 커밋하지 마세요.")
             manifest["sources"][name] = {"recorded_on": today.isoformat()}
             MANIFEST.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
 
