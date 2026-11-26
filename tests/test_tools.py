@@ -517,6 +517,12 @@ async def test_tool_descriptions_ask_for_the_citation():
         assert "citation" in tool.description, tool.name
 
 
+async def test_tool_descriptions_say_when_to_use_them():
+    """도구 설명마다 기억이나 추측 대신 이 도구를 쓰라는 안내가 있다."""
+    for tool in await server.mcp.list_tools():
+        assert "이 도구" in tool.description, tool.name
+
+
 async def test_tools_are_registered_with_mcp():
     """도구 5개가 등록돼 있고 필수 인자가 스키마에 드러난다."""
     tools = {tool.name: tool for tool in await server.mcp.list_tools()}
