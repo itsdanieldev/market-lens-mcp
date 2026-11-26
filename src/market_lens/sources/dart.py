@@ -14,6 +14,7 @@ from xml.etree import ElementTree
 
 from ..cache import TTL_DISCLOSURE_LIST, TTL_LONG, TTL_REFERENCE
 from ..errors import NotFoundError, SourceError
+from ..util import clean_stock_code, is_stock_code, norm_name, to_int, ymd_to_iso
 from ._base import BaseSource, Fetched
 
 BASE_URL = "https://opendart.fss.or.kr/api"
@@ -90,8 +91,35 @@ def document_to_text(markup: str) -> str:
     return "\n".join(line for line in lines if line and set(line) - {"|", " "})
 
 
-def _norm_name(name: str) -> str:
-    return re.sub(r"\s+", "", name).casefold()
+def _disclosure(row: dict[str, Any]) -> dict[str, Any]:
+    """list.json 한 행 → models.Disclosure 필드."""
+    return {
+        "rcept_no": row["rcept_no"],
+        "title": (row.get("report_nm") or "").strip(),
+        "date": ymd_to_iso(row.get("rcept_dt", "")),
+        "filer": row.get("flr_nm", ""),
+        "corp_name": row.get("corp_name", ""),
+        "remark": row.get("rm", "") or "",
+        "url": VIEWER_URL.format(rcept_no=row["rcept_no"]),
+    }
+
+
+def _account(row: dict[str, Any]) -> dict[str, Any]:
+    """fnlttSinglAcnt.json 한 행 → 계정 한 줄. 금액은 정수(원)로 바꾼다."""
+    return {
+        "name": row.get("account_nm", ""),
+        "consolidated": row.get("fs_div") == "CFS",
+        "statement": row.get("fs_nm"),
+        "is_income": row.get("sj_div") == "IS",
+        "current": to_int(row.get("thstrm_amount")),
+        "current_period": row.get("thstrm_dt"),
+        "prior": to_int(row.get("frmtrm_amount")),
+        "prior_period": row.get("frmtrm_dt"),
+        "cumulative": to_int(row.get("thstrm_add_amount")),
+        "prior_cumulative": to_int(row.get("frmtrm_add_amount")),
+        "currency": row.get("currency"),
+        "rcept_no": row.get("rcept_no"),
+    }
 
 
 class DartClient(BaseSource):
@@ -124,21 +152,20 @@ class DartClient(BaseSource):
     async def find_corp(self, query: str) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
         """종목코드 또는 회사명으로 찾는다. (정확히 일치한 회사, 부분 일치 후보)를 돌려준다."""
         corps = (await self.corp_index()).value
-        q = query.strip()
-        code = q.upper().removeprefix("A") if re.fullmatch(r"[Aa]?\d[0-9A-Za-z]{5}", q) else None
-        if code:
+        if is_stock_code(query):
+            code = clean_stock_code(query)
             exact = [c for c in corps if c["stock_code"] == code]
             return (exact[0] if exact else None), []
-        target = _norm_name(q)
-        exact = [c for c in corps if _norm_name(c["corp_name"]) == target]
-        partial = [c for c in corps if target in _norm_name(c["corp_name"])]
+        target = norm_name(query.strip())
+        exact = [c for c in corps if norm_name(c["corp_name"]) == target]
+        partial = [c for c in corps if target in norm_name(c["corp_name"])]
         partial.sort(key=lambda c: len(c["corp_name"]))
         return (exact[0] if exact else None), partial[:10]
 
     async def list_disclosures(
         self, corp_code: str, begin: str, end: str, kind: str | None, limit: int
     ) -> Fetched:
-        """공시 목록(최신순). begin/end는 YYYYMMDD."""
+        """공시 목록(최신순): {total_count, items: [Disclosure 필드]}. begin/end는 YYYYMMDD."""
 
         async def load() -> dict[str, Any]:
             items: list[dict[str, Any]] = []
@@ -164,7 +191,8 @@ class DartClient(BaseSource):
             return {"total_count": total, "items": items[:limit]}
 
         key = f"dart:list:{corp_code}:{begin}:{end}:{kind or '-'}:{limit}"
-        return await self._cached(key, TTL_DISCLOSURE_LIST, load)
+        listing = await self._cached(key, TTL_DISCLOSURE_LIST, load)
+        return listing.map(lambda v: {**v, "items": [_disclosure(row) for row in v["items"]]})
 
     async def document_text(self, rcept_no: str) -> Fetched:
         """공시 원문 전체 텍스트. 첨부가 여러 개면 본문(접수번호.xml)을 고른다."""
@@ -185,7 +213,7 @@ class DartClient(BaseSource):
         return await self._cached(f"dart:doc:{rcept_no}", TTL_LONG, load)
 
     async def financials(self, corp_code: str, year: int, quarter: int) -> Fetched:
-        """단일회사 주요계정(fnlttSinglAcnt) 원본 행 목록. 자료가 없으면 빈 목록."""
+        """단일회사 주요계정(fnlttSinglAcnt)의 계정 목록. 자료가 없으면 빈 목록."""
 
         async def load() -> list[dict[str, Any]]:
             params = {
@@ -198,13 +226,9 @@ class DartClient(BaseSource):
             return payload.get("list") or []
 
         key = f"dart:fin:{corp_code}:{year}:{quarter}"
-        hit = self._cache.get(key)
-        if hit is not None:
-            return Fetched(hit.value, hit.stored_at, True)
-        rows = await load()
-        if rows:  # 아직 제출되지 않은 분기(빈 응답)는 캐시하지 않는다
-            self._cache.set(key, rows, TTL_LONG)
-        return Fetched(rows, self._cache.now(), False)
+        # 아직 제출되지 않은 분기(빈 응답)는 캐시하지 않는다
+        rows = await self._cached(key, TTL_LONG, load, keep=bool)
+        return rows.map(lambda v: [_account(row) for row in v])
 
     @staticmethod
     def _json(response: Any) -> dict[str, Any]:

@@ -10,6 +10,22 @@ from .errors import InvalidInputError
 KST = timezone(timedelta(hours=9))
 
 
+def is_stock_code(query: str) -> bool:
+    """'005930', 'A005930'처럼 종목코드 모양인지."""
+    return bool(re.fullmatch(r"[Aa]?\d[0-9A-Za-z]{5}", query.strip()))
+
+
+def clean_stock_code(code: str) -> str:
+    """'A005930'처럼 접두 문자가 붙은 단축코드를 6자리로 바꾼다."""
+    text = (code or "").strip().upper()
+    return text[1:] if len(text) == 7 and text[0].isalpha() else text
+
+
+def norm_name(name: str) -> str:
+    """이름 비교용: 공백을 없애고 대소문자를 무시한다."""
+    return re.sub(r"\s+", "", name).casefold()
+
+
 def now_kst() -> datetime:
     return datetime.now(KST)
 

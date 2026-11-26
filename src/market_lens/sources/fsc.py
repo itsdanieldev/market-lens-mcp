@@ -15,7 +15,7 @@ from typing import Any
 
 from ..cache import TTL_REFERENCE, seconds_until_kst_midnight
 from ..errors import SourceError
-from ..util import now_kst, ymd
+from ..util import clean_stock_code, now_kst, to_float, to_int, ymd, ymd_to_iso
 from ._base import BaseSource, Fetched
 
 BASE_URL = "https://apis.data.go.kr/1160100"
@@ -29,10 +29,35 @@ MAX_PAGES = 10
 ITEM_LOOKBACK_DAYS = 10  # 연휴를 넘겨도 최근 기준일이 잡히도록
 
 
-def strip_code(srtn_cd: str) -> str:
-    """상장종목정보의 단축코드는 'A005930'처럼 접두 문자가 붙는다."""
-    code = (srtn_cd or "").strip()
-    return code[1:] if len(code) == 7 and code[0].isalpha() else code
+def _item(row: dict[str, Any]) -> dict[str, str]:
+    """getItemInfo_V2 한 행 → 종목 한 줄. 단축코드는 'A005930'처럼 접두 문자가 붙어 온다."""
+    return {
+        "short_code": clean_stock_code(row.get("srtnCd", "")),
+        "isin": row.get("isinCd", ""),
+        "name": row.get("itmsNm", ""),
+        "market": row.get("mrktCtg", ""),
+        "corp_name": row.get("corpNm", ""),
+        "base_date": row.get("basDt", ""),
+    }
+
+
+def _price(row: dict[str, Any]) -> dict[str, Any]:
+    """getStockPriceInfo_V2 한 행 → 일별 시세 한 줄(models.PriceRow 필드 + 종목 정보)."""
+    return {
+        "date": ymd_to_iso(row["basDt"]),
+        "open": to_int(row.get("mkp")) or 0,
+        "high": to_int(row.get("hipr")) or 0,
+        "low": to_int(row.get("lopr")) or 0,
+        "close": to_int(row.get("clpr")) or 0,
+        "volume": to_int(row.get("trqu")) or 0,
+        "trading_value": to_int(row.get("trPrc")),
+        "change": to_int(row.get("vs")),
+        "change_pct": to_float(row.get("fltRt")),
+        "market_cap": to_int(row.get("mrktTotAmt")),
+        "name": row.get("itmsNm"),
+        "isin": row.get("isinCd"),
+        "market": row.get("mrktCtg"),
+    }
 
 
 class FscClient(BaseSource):
@@ -51,14 +76,7 @@ class FscClient(BaseSource):
                 params["likeItmsNm"] = name
             latest: dict[str, dict[str, str]] = {}
             for row in await self._fetch_all(ITEM_URL, params):
-                item = {
-                    "short_code": strip_code(row.get("srtnCd", "")),
-                    "isin": row.get("isinCd", ""),
-                    "name": row.get("itmsNm", ""),
-                    "market": row.get("mrktCtg", ""),
-                    "corp_name": row.get("corpNm", ""),
-                    "base_date": row.get("basDt", ""),
-                }
+                item = _item(row)
                 seen = latest.get(item["short_code"])
                 if seen is None or item["base_date"] > seen["base_date"]:
                     latest[item["short_code"]] = item
@@ -68,7 +86,7 @@ class FscClient(BaseSource):
         return await self._cached(key, TTL_REFERENCE, load)
 
     async def stock_prices(self, code: str, begin: date, end: date) -> Fetched:
-        """일별 시세 원본 행(날짜 오름차순). begin, end 모두 포함."""
+        """일별 시세(날짜 오름차순). begin, end 모두 포함."""
 
         async def load() -> list[dict[str, Any]]:
             params = {
@@ -81,7 +99,8 @@ class FscClient(BaseSource):
             return sorted(rows, key=lambda r: r.get("basDt", ""))
 
         key = f"fsc:prices:{code}:{ymd(begin)}:{ymd(end)}"
-        return await self._cached(key, seconds_until_kst_midnight(self._cache.now()), load)
+        rows = await self._cached(key, seconds_until_kst_midnight(self._cache.now()), load)
+        return rows.map(lambda v: [_price(row) for row in v])
 
     async def _fetch_all(self, url: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

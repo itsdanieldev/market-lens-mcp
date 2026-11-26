@@ -22,6 +22,10 @@ class Fetched:
     fetched_at: float  # epoch 초. 캐시된 값이면 처음 받아 온 시각
     cached: bool
 
+    def map(self, convert: Callable[[Any], Any]) -> Fetched:
+        """받아 온 시각과 캐시 여부는 그대로 두고 값만 바꾼다."""
+        return Fetched(convert(self.value), self.fetched_at, self.cached)
+
 
 class BaseSource:
     name = "source"
@@ -47,10 +51,19 @@ class BaseSource:
                 await asyncio.sleep(RETRY_DELAY * 2**attempt)
         raise SourceError(f"{self.name} 요청 실패: {last}")
 
-    async def _cached(self, key: str, ttl: float, loader: Callable[[], Awaitable[Any]]) -> Fetched:
+    async def _cached(
+        self,
+        key: str,
+        ttl: float,
+        loader: Callable[[], Awaitable[Any]],
+        *,
+        keep: Callable[[Any], bool] = lambda value: True,
+    ) -> Fetched:
+        """캐시에 있으면 그 값을, 없으면 loader로 받아 저장한다. keep이 False인 값은 저장하지 않는다."""
         hit = self._cache.get(key)
         if hit is not None:
             return Fetched(hit.value, hit.stored_at, True)
         value = await loader()
-        self._cache.set(key, value, ttl)
+        if keep(value):
+            self._cache.set(key, value, ttl)
         return Fetched(value, self._cache.now(), False)

@@ -33,7 +33,16 @@ from .models import (
 from .sources import dart as dart_api
 from .sources import fsc as fsc_api
 from .sources._base import Fetched
-from .util import iso_kst, now_kst, parse_date, to_float, to_int, ymd, ymd_to_iso
+from .util import (
+    clean_stock_code,
+    is_stock_code,
+    iso_kst,
+    norm_name,
+    now_kst,
+    parse_date,
+    ymd,
+    ymd_to_iso,
+)
 
 INSTRUCTIONS = """\
 한국 상장사의 공시, 재무제표, 주가를 공식 API(DART, 공공데이터포털 금융위원회)로 조회하는 \
@@ -126,19 +135,6 @@ def _envelope(
     ).model_dump()
 
 
-def _is_code(query: str) -> bool:
-    return bool(re.fullmatch(r"[Aa]?\d[0-9A-Za-z]{5}", query.strip()))
-
-
-def _clean_code(query: str) -> str:
-    code = query.strip().upper()
-    return code[1:] if len(code) == 7 else code
-
-
-def _norm(name: str) -> str:
-    return re.sub(r"\s+", "", name).casefold()
-
-
 async def _find_corp(ticker: str) -> dict[str, str]:
     """DART 도구용: 종목명/코드 → {corp_code, corp_name, stock_code}."""
     corp, candidates = await get_app().dart.find_corp(ticker)
@@ -186,8 +182,8 @@ async def resolve_ticker(
     items: Fetched | None = None
     if app.settings.data_go_kr_key:
         try:
-            if _is_code(query):
-                items = await app.fsc.search_items(code=_clean_code(query))
+            if is_stock_code(query):
+                items = await app.fsc.search_items(code=clean_stock_code(query))
             else:
                 items = await app.fsc.search_items(name=query)
         except SourceError as exc:
@@ -225,10 +221,10 @@ async def resolve_ticker(
                 Ticker(short_code=c["stock_code"], name=c["corp_name"], corp_code=c["corp_code"])
             )
 
-    if _is_code(query):
-        exact = [t for t in tickers if t.short_code == _clean_code(query)]
+    if is_stock_code(query):
+        exact = [t for t in tickers if t.short_code == clean_stock_code(query)]
     else:
-        exact = [t for t in tickers if _norm(t.name) == _norm(query)]
+        exact = [t for t in tickers if norm_name(t.name) == norm_name(query)]
     match = exact[0] if exact else (tickers[0] if len(tickers) == 1 else None)
     if match is None and not tickers:
         warnings.append("일치하는 상장 종목이 없습니다.")
@@ -269,18 +265,7 @@ async def list_disclosures(
     listing = await get_app().dart.list_disclosures(
         corp["corp_code"], ymd(start), ymd(end), kind, limit
     )
-    disclosures = [
-        Disclosure(
-            rcept_no=row["rcept_no"],
-            title=(row.get("report_nm") or "").strip(),
-            date=ymd_to_iso(row.get("rcept_dt", "")),
-            filer=row.get("flr_nm", ""),
-            corp_name=row.get("corp_name", ""),
-            remark=row.get("rm", "") or "",
-            url=dart_api.VIEWER_URL.format(rcept_no=row["rcept_no"]),
-        )
-        for row in listing.value["items"]
-    ]
+    disclosures = [Disclosure(**item) for item in listing.value["items"]]
     data = DisclosureList(
         corp_code=corp["corp_code"],
         corp_name=corp["corp_name"],
@@ -304,7 +289,7 @@ def _disclosure_kind(value: str | None) -> str | None:
     if text.upper() in dart_api.DISCLOSURE_TYPES:
         return text.upper()
     for code, name in dart_api.DISCLOSURE_TYPES.items():
-        if _norm(name) == _norm(text):
+        if norm_name(name) == norm_name(text):
             return code
     raise InvalidInputError(
         f"알 수 없는 공시유형: {value!r}. A~J 코드 또는 '정기공시' 같은 이름을 쓰세요."
@@ -377,28 +362,28 @@ async def get_financials(
             "아직 제출 전이거나 대상이 아닐 수 있습니다."
         )
     warnings: list[str] = []
-    fs_div = "CFS" if any(r.get("fs_div") == "CFS" for r in rows) else "OFS"
-    if fs_div == "OFS":
+    consolidated = any(r["consolidated"] for r in rows)
+    if not consolidated:
         warnings.append("연결재무제표가 없어 별도재무제표 기준입니다.")
-    rows = [r for r in rows if r.get("fs_div") == fs_div]
+    rows = [r for r in rows if r["consolidated"] == consolidated]
 
     accounts: dict[str, Account | None] = {}
     for key, matches in ACCOUNT_MATCHERS.items():
-        row = next((r for r in rows if matches(_norm(r.get("account_nm", "")))), None)
+        row = next((r for r in rows if matches(norm_name(r["name"]))), None)
         if row is None:
             accounts[key] = None
             warnings.append(f"{key} 계정을 응답에서 찾지 못했습니다.")
             continue
         # 분기·반기 손익의 기간 표기는 누적 구간인데 금액은 3개월분이라 기간을 금액에 맞춘다.
-        period = _three_months if quarter != 4 and row.get("sj_div") == "IS" else _as_is
+        period = _three_months if quarter != 4 and row["is_income"] else _as_is
         accounts[key] = Account(
-            label=row.get("account_nm", ""),
-            current=to_int(row.get("thstrm_amount")),
-            current_period=period(row.get("thstrm_dt")),
-            prior=to_int(row.get("frmtrm_amount")),
-            prior_period=period(row.get("frmtrm_dt")),
-            cumulative=to_int(row.get("thstrm_add_amount")),
-            prior_cumulative=to_int(row.get("frmtrm_add_amount")),
+            label=row["name"],
+            current=row["current"],
+            current_period=period(row["current_period"]),
+            prior=row["prior"],
+            prior_period=period(row["prior_period"]),
+            cumulative=row["cumulative"],
+            prior_cumulative=row["prior_cumulative"],
         )
 
     def cur(key: str) -> int | None:
@@ -435,9 +420,9 @@ async def get_financials(
         quarter=quarter,
         report=REPORT_NAMES[quarter],
         period_type="annual" if quarter == 4 else "quarter",
-        statement=first.get("fs_nm"),
-        currency=first.get("currency"),
-        rcept_no=first.get("rcept_no"),
+        statement=first["statement"],
+        currency=first["currency"],
+        rcept_no=first["rcept_no"],
         accounts=accounts,
     )
     return _envelope(dart_api.SOURCE, as_of, data, fetched, computed=computed, warnings=warnings)
@@ -461,12 +446,12 @@ async def get_stock_prices(
     if start > end:
         raise InvalidInputError("start_date가 end_date보다 늦습니다.")
     fetched: list[Fetched] = []
-    if _is_code(ticker):
-        code = _clean_code(ticker)
+    if is_stock_code(ticker):
+        code = clean_stock_code(ticker)
     else:
         items = await app.fsc.search_items(name=ticker.strip())
         fetched.append(items)
-        exact = [i for i in items.value if _norm(i["name"]) == _norm(ticker)]
+        exact = [i for i in items.value if norm_name(i["name"]) == norm_name(ticker)]
         if not exact:
             names = ", ".join(f"{i['name']}({i['short_code']})" for i in items.value[:5])
             raise NotFoundError(
@@ -477,30 +462,16 @@ async def get_stock_prices(
 
     raw = await app.fsc.stock_prices(code, start, end)
     fetched.append(raw)
-    rows = [
-        PriceRow(
-            date=ymd_to_iso(r["basDt"]),
-            open=to_int(r.get("mkp")) or 0,
-            high=to_int(r.get("hipr")) or 0,
-            low=to_int(r.get("lopr")) or 0,
-            close=to_int(r.get("clpr")) or 0,
-            volume=to_int(r.get("trqu")) or 0,
-            trading_value=to_int(r.get("trPrc")),
-            change=to_int(r.get("vs")),
-            change_pct=to_float(r.get("fltRt")),
-            market_cap=to_int(r.get("mrktTotAmt")),
-        )
-        for r in raw.value
-    ]
+    rows = [PriceRow(**{field: r[field] for field in PriceRow.model_fields}) for r in raw.value]
     warnings = ["수정주가가 아닙니다. 기간 안에 액면분할·증자 등이 있으면 수익률이 왜곡됩니다."]
     if not rows:
         warnings.append("해당 기간에 시세 자료가 없습니다. 종목코드와 기간을 확인하세요.")
     last = raw.value[-1] if raw.value else {}
     data = Prices(
         short_code=code,
-        name=last.get("itmsNm"),
-        isin=last.get("isinCd"),
-        market=last.get("mrktCtg"),
+        name=last.get("name"),
+        isin=last.get("isin"),
+        market=last.get("market"),
         start_date=start.isoformat(),
         end_date=end.isoformat(),
         prices=rows,
