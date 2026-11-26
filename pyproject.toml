@@ -5,6 +5,20 @@ description = "한국 주식 리서치용 MCP 서버 (DART 공시·재무, 금�
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [{ name = "market-lens-mcp contributors" }]
+keywords = ["mcp", "model-context-protocol", "dart", "korea", "stock", "krx"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Korean",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
 dependencies = [
     "mcp>=2,<3",
     "httpx>=0.27",
@@ -12,6 +26,11 @@ dependencies = [
     "pydantic>=2.7",
     "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/itsdanieldev/market-lens-mcp"
+Repository = "https://github.com/itsdanieldev/market-lens-mcp"
+Issues = "https://github.com/itsdanieldev/market-lens-mcp/issues"
 
 [project.scripts]
 market-lens-mcp = "market_lens.server:main"
@@ -25,6 +44,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/market_lens"]
+
+# 소스 배포판에는 설치와 테스트에 필요한 것만 싣는다. 목록에 없는 파일(.env 등)은 들어가지 않는다.
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "scripts", "examples", "README.md", "DISCLAIMER.md", "LICENSE", ".env.example"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
