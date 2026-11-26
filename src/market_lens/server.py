@@ -33,6 +33,10 @@ MAX_TEXT_CHARS = 50_000
 
 mcp = MCPServer("market-lens", instructions=INSTRUCTIONS, version=__version__)
 
+# 아래 도구 함수의 docstring은 MCP 클라이언트를 거쳐 모델이 읽는 도구 설명으로 통째로 전달된다.
+# 그래서 Args/Returns 절을 두지 않고 모델이 알아야 할 내용만 적는다. 인자 설명은
+# Field(description=...)에 적으면 도구의 입력 스키마로 전달된다.
+
 
 @mcp.tool()
 async def resolve_ticker(

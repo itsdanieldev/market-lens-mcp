@@ -19,7 +19,20 @@ def envelope(
     computed: dict[str, Any] | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, Any]:
-    """모든 도구가 돌려주는 공통 형식. 여러 번 받아 왔으면 가장 이른 시각을 적는다."""
+    """도구 응답을 공통 형식(models.Envelope)으로 만든다.
+
+    Args:
+        source: 데이터 출처 이름.
+        as_of: 데이터 기준일 또는 기준 시각.
+        data: 도구별 결과 모델.
+        *fetched: 이 응답을 만드는 데 쓴 조회 결과들. 하나 이상 넘긴다.
+        computed: 코드로 계산한 파생 수치.
+        warnings: 주의 사항.
+
+    Returns:
+        Envelope를 dict로 바꾼 값. fetched_at은 조회 가운데 가장 이른 시각이고,
+        cached는 모든 조회가 캐시였을 때만 True다.
+    """
     return Envelope(
         source=source,
         as_of=as_of,
@@ -32,7 +45,18 @@ def envelope(
 
 
 async def find_corp(dart: DartClient, ticker: str) -> dict[str, str]:
-    """종목명/코드 → {corp_code, corp_name, stock_code}. 없으면 비슷한 회사를 알려 준다."""
+    """종목명이나 종목코드로 DART 회사를 찾는다.
+
+    Args:
+        dart: DART 클라이언트.
+        ticker: 종목명 또는 6자리 종목코드.
+
+    Returns:
+        corp_code, corp_name, stock_code를 담은 dict.
+
+    Raises:
+        NotFoundError: 일치하는 상장사가 없을 때. 비슷한 회사가 있으면 메시지에 싣는다.
+    """
     corp, candidates = await dart.find_corp(ticker)
     if corp:
         return corp

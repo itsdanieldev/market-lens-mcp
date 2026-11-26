@@ -21,7 +21,15 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class App:
-    """테스트에서는 http와 cache를 바꿔 넣고 set_app으로 끼운다."""
+    """설정, 캐시, HTTP 클라이언트, 소스 클라이언트를 묶은 객체.
+
+    테스트에서는 http와 cache를 바꿔 넣고 set_app으로 끼운다.
+
+    Attributes:
+        settings: 키와 캐시 경로.
+        http: 모든 소스가 함께 쓰는 HTTP 클라이언트.
+        cache: 모든 소스가 함께 쓰는 캐시.
+    """
 
     def __init__(
         self,
@@ -29,33 +37,62 @@ class App:
         http: httpx.AsyncClient | None = None,
         cache: Cache | None = None,
     ):
-        """http와 cache를 생략하면 실제 HTTP 클라이언트와 설정된 경로의 SQLite 캐시를 쓴다."""
+        """App을 만든다.
+
+        Args:
+            settings: 키와 캐시 경로.
+            http: HTTP 클라이언트. 생략하면 타임아웃 20초인 클라이언트를 만든다.
+            cache: 캐시. 생략하면 settings.cache_path의 SQLite 캐시를 연다.
+        """
         self.settings = settings
         self.http = http or httpx.AsyncClient(timeout=20.0)
         self.cache = cache or Cache(settings.cache_path)
 
+    # cached_property는 예외가 나면 값을 저장하지 않으므로, 키가 없으면 부를 때마다 오류가 난다.
     @cached_property
     def dart(self) -> DartClient:
-        """DART 클라이언트. 키가 없으면 발급 안내와 함께 MissingKeyError."""
+        """DART 클라이언트. 처음 쓸 때 한 번 만든다.
+
+        Returns:
+            DART 클라이언트.
+
+        Raises:
+            MissingKeyError: DART_API_KEY가 없을 때.
+        """
         if not self.settings.dart_api_key:
             raise MissingKeyError("DART_API_KEY", "https://opendart.fss.or.kr")
         return DartClient(self.settings.dart_api_key, self.http, self.cache)
 
     @cached_property
     def fsc(self) -> FscClient:
-        """공공데이터포털 클라이언트. 키가 없으면 발급 안내와 함께 MissingKeyError."""
+        """공공데이터포털 클라이언트. 처음 쓸 때 한 번 만든다.
+
+        Returns:
+            공공데이터포털 클라이언트.
+
+        Raises:
+            MissingKeyError: DATA_GO_KR_KEY가 없을 때.
+        """
         if not self.settings.data_go_kr_key:
             raise MissingKeyError("DATA_GO_KR_KEY", "https://www.data.go.kr")
         return FscClient(self.settings.data_go_kr_key, self.http, self.cache)
 
     @property
     def dart_or_none(self) -> DartClient | None:
-        """DART 키가 있으면 클라이언트, 없으면 None. 키 없이도 동작하는 도구용."""
+        """키 없이도 동작하는 도구를 위한 DART 클라이언트.
+
+        Returns:
+            DART 키가 있으면 클라이언트, 없으면 None.
+        """
         return self.dart if self.settings.dart_api_key else None
 
     @property
     def fsc_or_none(self) -> FscClient | None:
-        """공공데이터포털 키가 있으면 클라이언트, 없으면 None. 키 없이도 동작하는 도구용."""
+        """키 없이도 동작하는 도구를 위한 공공데이터포털 클라이언트.
+
+        Returns:
+            공공데이터포털 키가 있으면 클라이언트, 없으면 None.
+        """
         return self.fsc if self.settings.data_go_kr_key else None
 
 
@@ -63,7 +100,11 @@ _app: App | None = None
 
 
 def get_app() -> App:
-    """프로세스에서 함께 쓰는 App. 처음 불릴 때 환경변수와 .env를 읽어 만든다."""
+    """프로세스에서 함께 쓰는 App을 돌려준다.
+
+    Returns:
+        함께 쓰는 App. 처음 불릴 때 환경변수와 .env를 읽어 만든다.
+    """
     global _app
     if _app is None:
         _app = App(load_settings())
@@ -71,6 +112,10 @@ def get_app() -> App:
 
 
 def set_app(app: App | None) -> None:
-    """함께 쓰는 App을 바꿔 끼운다(테스트용). None을 넘기면 다음 get_app이 새로 만든다."""
+    """함께 쓰는 App을 바꿔 끼운다(테스트용).
+
+    Args:
+        app: 끼울 App. None이면 다음 get_app이 새로 만든다.
+    """
     global _app
     _app = app

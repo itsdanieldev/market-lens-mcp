@@ -30,7 +30,14 @@ ITEM_LOOKBACK_DAYS = 10  # 연휴를 넘겨도 최근 기준일이 잡히도록
 
 
 def _item(row: dict[str, Any]) -> dict[str, str]:
-    """getItemInfo_V2 한 행 → 종목 한 줄. 단축코드는 'A005930'처럼 접두 문자가 붙어 온다."""
+    """getItemInfo_V2의 한 행을 종목 한 줄로 바꾼다.
+
+    Args:
+        row: 원본 행. 단축코드는 'A005930'처럼 접두 문자가 붙어 온다.
+
+    Returns:
+        short_code(6자리), isin, name, market, corp_name, base_date(YYYYMMDD)를 담은 dict.
+    """
     return {
         "short_code": clean_stock_code(row.get("srtnCd", "")),
         "isin": row.get("isinCd", ""),
@@ -42,7 +49,14 @@ def _item(row: dict[str, Any]) -> dict[str, str]:
 
 
 def _price(row: dict[str, Any]) -> dict[str, Any]:
-    """getStockPriceInfo_V2 한 행 → 일별 시세 한 줄(models.PriceRow 필드 + 종목 정보)."""
+    """getStockPriceInfo_V2의 한 행을 일별 시세 한 줄로 바꾼다.
+
+    Args:
+        row: 원본 행. 숫자는 문자열로 온다.
+
+    Returns:
+        models.PriceRow의 필드와 종목 정보(name, isin, market)를 담은 dict.
+    """
     return {
         "date": ymd_to_iso(row["basDt"]),
         "open": to_int(row.get("mkp")) or 0,
@@ -61,15 +75,31 @@ def _price(row: dict[str, Any]) -> dict[str, Any]:
 
 
 class FscClient(BaseSource):
-    """공공데이터포털 금융위원회 API 호출. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
+    """공공데이터포털 금융위원회 API 클라이언트. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
 
     name = "공공데이터포털"
 
     async def search_items(self, *, name: str | None = None, code: str | None = None) -> Fetched:
-        """상장종목 검색(이름 부분 일치 또는 단축코드). 종목별 최신 기준일 한 건씩 돌려준다."""
+        """상장종목을 검색한다(1일 캐시).
+
+        Args:
+            name: 종목명의 일부. code를 주지 않을 때 쓴다.
+            code: 단축코드. 주면 name 대신 코드로 찾는다.
+
+        Returns:
+            값이 종목 목록(_item 형식)인 Fetched. 종목마다 최신 기준일 한 건만 있고,
+            이름이 짧은 순으로 정렬돼 있다.
+
+        Raises:
+            SourceError: 공공데이터포털이 오류를 돌려줬을 때.
+        """
 
         async def load() -> list[dict[str, str]]:
-            """최근 며칠 치 종목 행을 받아 종목별 최신 기준일 한 건만 남긴다."""
+            """최근 며칠 치 종목 행을 받아 종목별 최신 기준일 한 건만 남긴다.
+
+            Returns:
+                종목 목록.
+            """
             params: dict[str, Any] = {
                 "beginBasDt": ymd(now_kst().date() - timedelta(days=ITEM_LOOKBACK_DAYS))
             }
@@ -80,25 +110,44 @@ class FscClient(BaseSource):
             latest: dict[str, dict[str, str]] = {}
             for row in await self._fetch_all(ITEM_URL, params):
                 item = _item(row)
+                # 같은 종목이 기준일마다 한 줄씩 오므로 가장 최근 기준일만 남긴다.
                 seen = latest.get(item["short_code"])
                 if seen is None or item["base_date"] > seen["base_date"]:
                     latest[item["short_code"]] = item
+            # 이름이 짧은 종목을 앞에 둔다. '삼성전자'로 찾으면 '삼성전자'가 먼저 온다.
             return sorted(latest.values(), key=lambda i: (len(i["name"]), i["short_code"]))
 
         key = f"fsc:items:{'code' if code else 'name'}:{code or name}"
         return await self._cached(key, TTL_REFERENCE, load)
 
     async def stock_prices(self, code: str, begin: date, end: date) -> Fetched:
-        """일별 시세(날짜 오름차순). begin, end 모두 포함."""
+        """일별 시세를 받는다(KST 자정까지 캐시).
+
+        Args:
+            code: 6자리 단축코드.
+            begin: 시작일(포함).
+            end: 종료일(포함).
+
+        Returns:
+            값이 일별 시세 목록(_price 형식, 날짜 오름차순)인 Fetched.
+
+        Raises:
+            SourceError: 공공데이터포털이 오류를 돌려줬을 때.
+        """
 
         async def load() -> list[dict[str, Any]]:
-            """기간 안의 원본 시세 행을 받아 코드가 정확히 같은 행만 날짜순으로 남긴다."""
+            """기간 안의 원본 시세 행을 받아 코드가 정확히 같은 행만 날짜순으로 남긴다.
+
+            Returns:
+                원본 행 목록.
+            """
             params = {
                 "likeSrtnCd": code,
                 "beginBasDt": ymd(begin),
                 # endBasDt는 '검색값보다 작은' 조건이라 하루를 더해 종료일을 포함시킨다.
                 "endBasDt": ymd(end + timedelta(days=1)),
             }
+            # likeSrtnCd는 부분 일치라 코드가 더 긴 다른 종목이 섞일 수 있어 정확히 같은 행만 쓴다.
             rows = [r for r in await self._fetch_all(PRICE_URL, params) if r.get("srtnCd") == code]
             return sorted(rows, key=lambda r: r.get("basDt", ""))
 
@@ -107,7 +156,18 @@ class FscClient(BaseSource):
         return rows.map(lambda v: [_price(row) for row in v])
 
     async def _fetch_all(self, url: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-        """전체 건수를 채울 때까지 페이지를 넘기며 받는다(최대 MAX_PAGES 쪽)."""
+        """전체 건수를 채울 때까지 페이지를 넘기며 받는다.
+
+        Args:
+            url: API 주소.
+            params: 검색 조건. 인증키, 결과 형식, 페이지 정보는 여기서 붙인다.
+
+        Returns:
+            원본 행 목록. 최대 MAX_PAGES쪽까지만 받는다.
+
+        Raises:
+            SourceError: 공공데이터포털이 오류를 돌려줬을 때.
+        """
         rows: list[dict[str, Any]] = []
         for page in range(1, MAX_PAGES + 1):
             query = {
@@ -119,13 +179,24 @@ class FscClient(BaseSource):
             }
             items, total = _parse(await self._get(url, query))
             rows.extend(items)
+            # 빈 쪽이 오거나 전체 건수를 다 받았으면 멈춘다.
             if not items or len(rows) >= total:
                 break
         return rows
 
 
 def _parse(response: Any) -> tuple[list[dict[str, Any]], int]:
-    """응답에서 (행 목록, 전체 건수)를 꺼낸다. 오류 응답이면 사유를 담아 SourceError를 던진다."""
+    """응답에서 행 목록과 전체 건수를 꺼낸다.
+
+    Args:
+        response: HTTP 응답.
+
+    Returns:
+        (원본 행 목록, 전체 건수). 결과가 없으면 빈 목록.
+
+    Raises:
+        SourceError: 키 오류처럼 형식이 다른 응답이거나 결과코드가 '00'이 아닐 때.
+    """
     try:
         payload = response.json()
         header = payload["response"]["header"]
@@ -147,8 +218,10 @@ def _parse(response: Any) -> tuple[list[dict[str, Any]], int]:
         raise SourceError(
             f"공공데이터포털 오류 {header.get('resultCode')}: {header.get('resultMsg')}"
         )
+    # 결과가 없을 때 items가 dict가 아닌 값(빈 문자열 등)으로 올 수 있어 방어적으로 읽는다.
     items = body.get("items") or {}
     item = items.get("item") if isinstance(items, dict) else None
+    # XML을 JSON으로 바꾼 응답은 한 건일 때 목록이 아니라 dict 하나로 올 수 있다.
     if isinstance(item, dict):
         item = [item]
     return item or [], int(body.get("totalCount") or 0)

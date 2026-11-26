@@ -25,11 +25,17 @@ ENVELOPE_KEYS = {"source", "as_of", "fetched_at", "cached", "data", "disclaimer"
 
 
 def assert_envelope(result: dict) -> None:
+    """도구 응답이 공통 형식인지 확인한다.
+
+    Args:
+        result: 도구가 돌려준 응답.
+    """
     assert result.keys() >= ENVELOPE_KEYS
     assert result["source"] and result["as_of"]
 
 
 async def test_resolve_ticker_by_name(app):
+    """종목명으로 찾으면 두 소스의 식별자가 모두 채워진다."""
     result = await server.resolve_ticker("삼성전자")
     assert_envelope(result)
     assert result["data"]["match"] == {
@@ -47,6 +53,7 @@ async def test_resolve_ticker_by_name(app):
 
 
 async def test_resolve_ticker_by_code(app, api):
+    """종목코드로 찾으면 포털에 이름이 아니라 코드로 검색한다."""
     result = await server.resolve_ticker("005930")
     assert result["data"]["match"]["name"] == "삼성전자"
     assert result["data"]["match"]["isin"] == "KR7005930003"
@@ -68,6 +75,7 @@ def items_with_extra_listing() -> dict:
 
 
 async def test_resolve_ticker_candidates_and_no_dart_mapping(app, api):
+    """여러 종목이 걸리면 후보로 돌려주고, DART 고유번호가 없는 종목은 경고한다."""
     api.overrides["getItemInfo"] = httpx.Response(200, json=items_with_extra_listing())
     by_code = await server.resolve_ticker("005935")
     assert by_code["data"]["match"]["name"] == "삼성전자우"
@@ -79,6 +87,7 @@ async def test_resolve_ticker_candidates_and_no_dart_mapping(app, api):
 
 
 async def test_resolve_ticker_without_listing(app, api):
+    """포털에 종목이 없으면 확정하지 않고 경고한다(우선주가 이렇게 된다)."""
     payload = json.loads((FIXTURES / "fsc_items.json").read_text(encoding="utf-8"))
     payload["response"]["body"].update(totalCount=0, items="")
     api.overrides["getItemInfo"] = httpx.Response(200, json=payload)
@@ -88,6 +97,7 @@ async def test_resolve_ticker_without_listing(app, api):
 
 
 async def test_resolve_ticker_with_only_dart_key(make_app):
+    """포털 키가 없어도 DART만으로 종목코드와 corp_code를 돌려준다."""
     make_app(fsc_key=None)
     result = await server.resolve_ticker("삼성전자")
     assert result["data"]["match"]["corp_code"] == "00126380"
@@ -96,6 +106,7 @@ async def test_resolve_ticker_with_only_dart_key(make_app):
 
 
 async def test_resolve_ticker_falls_back_to_dart_when_portal_fails(make_app, api):
+    """포털 조회가 실패하면 DART로 답하고, DART도 없으면 오류를 그대로 알린다."""
     api.overrides["getItemInfo"] = httpx.Response(
         403,
         json={
@@ -128,6 +139,7 @@ async def test_resolve_ticker_falls_back_to_dart_when_portal_fails(make_app, api
 
 
 async def test_list_disclosures(app, api):
+    """공시 목록을 정규화해 돌려주고 기간과 공시유형을 DART 형식으로 보낸다."""
     result = await server.list_disclosures(
         "삼성전자",
         start_date="2026-10-26",
@@ -159,6 +171,7 @@ async def test_list_disclosures(app, api):
 
 
 async def test_list_disclosures_no_data_and_bad_type(app, api):
+    """자료가 없으면 빈 목록을 돌려주고, 모르는 공시유형은 거부한다."""
     api.overrides["list.json"] = httpx.Response(
         200, json={"status": "013", "message": "조회된 데이타가 없습니다."}
     )
@@ -169,6 +182,7 @@ async def test_list_disclosures_no_data_and_bad_type(app, api):
 
 
 async def test_get_disclosure_text_truncates_and_pages(app):
+    """원문을 줄 단위 텍스트로 바꾸고, 길면 잘라 next_offset으로 이어 읽게 한다."""
     full = await server.get_disclosure_text("20261118000151", max_chars=50_000)
     text = full["data"]["text"]
     lines = text.split("\n")
@@ -190,6 +204,7 @@ async def test_get_disclosure_text_truncates_and_pages(app):
 
 
 def test_document_to_text_handles_html_style_markup():
+    """HTML식 마크업에서도 스타일과 태그를 걷어 내고 표의 행을 한 줄로 만든다."""
     markup = (
         "<BODY><STYLE>.x { color: red; }</STYLE><TITLE>배당 결정</TITLE>"
         "<TABLE><TR><TD>1주당 배당금(원)</TD><TD>100</TD></TR></TABLE>"
@@ -204,6 +219,7 @@ def test_document_to_text_handles_html_style_markup():
 
 
 def test_quarter_income_period_is_narrowed_to_three_months():
+    """누적 구간 표기를 마지막 3개월로 바꾸고, 구간이 아니면 그대로 둔다."""
     assert three_months("2025.01.01 ~ 2025.09.30") == "2025.07.01 ~ 2025.09.30"
     assert three_months("2025.01.01 ~ 2025.03.31") == "2025.01.01 ~ 2025.03.31"
     assert three_months("2024.10.01 ~ 2025.01.31") == "2024.11.01 ~ 2025.01.31"
@@ -212,11 +228,13 @@ def test_quarter_income_period_is_narrowed_to_three_months():
 
 
 async def test_get_disclosure_text_rejects_bad_number(app):
+    """숫자 14자리가 아닌 접수번호는 거부한다."""
     with pytest.raises(ValueError):
         await server.get_disclosure_text("1234")
 
 
 async def test_get_financials_quarter(app):
+    """3분기보고서의 계정, 기간 표기, 파생 수치가 녹화본과 맞다."""
     result = await server.get_financials("삼성전자", 2025, 3)
     assert_envelope(result)
     data, computed = result["data"], result["computed"]
@@ -255,6 +273,7 @@ async def test_get_financials_quarter(app):
 
 
 async def test_get_financials_first_quarter(app):
+    """1분기는 3개월 금액과 누적 금액이 같다."""
     result = await server.get_financials("삼성전자", 2025, 1)
     data, computed = result["data"], result["computed"]
     assert data["report"] == "1분기보고서" and data["rcept_no"] == "20250515001922"
@@ -271,6 +290,7 @@ async def test_get_financials_first_quarter(app):
 
 
 async def test_get_financials_half_year(app):
+    """반기보고서의 current는 2분기 석 달 금액이고 cumulative는 상반기 누적이다."""
     result = await server.get_financials("삼성전자", 2025, 2)
     data, computed = result["data"], result["computed"]
     assert data["report"] == "반기보고서" and data["period_type"] == "quarter"
@@ -290,6 +310,7 @@ async def test_get_financials_half_year(app):
 
 
 async def test_get_financials_annual(app):
+    """사업보고서는 연간 금액이고 누적 금액과 누적 증감률이 없다."""
     result = await server.get_financials("삼성전자", 2024)
     data, computed = result["data"], result["computed"]
     assert data["report"] == "사업보고서" and data["period_type"] == "annual"
@@ -316,6 +337,7 @@ async def test_get_financials_annual(app):
 
 
 async def test_get_financials_skips_change_when_prior_is_a_loss(app, api):
+    """비교 금액이 적자면 그 계정의 증감률만 내지 않고 경고한다."""
     payload = json.loads((FIXTURES / "dart_financials.json").read_text(encoding="utf-8"))
     for row in payload["list"]:
         if row["account_nm"].startswith("당기순이익"):
@@ -329,6 +351,7 @@ async def test_get_financials_skips_change_when_prior_is_a_loss(app, api):
 
 
 async def test_get_financials_falls_back_to_separate_and_missing(app, api):
+    """연결재무제표가 없으면 별도 기준으로 답하고, 자료가 없으면 NotFoundError."""
     payload = json.loads((FIXTURES / "dart_financials.json").read_text(encoding="utf-8"))
     payload["list"] = [r for r in payload["list"] if r["fs_div"] == "OFS"]
     api.overrides["fnlttSinglAcnt"] = httpx.Response(200, json=payload)
@@ -343,6 +366,7 @@ async def test_get_financials_falls_back_to_separate_and_missing(app, api):
 
 
 async def test_get_stock_prices(app, api):
+    """시세를 날짜 오름차순으로 돌려주고 기간 요약을 계산한다."""
     result = await server.get_stock_prices("삼성전자", "2024-11-08", "2024-11-14")
     assert_envelope(result)
     data = result["data"]
@@ -391,6 +415,7 @@ async def test_get_stock_prices_drops_other_codes(app, api):
 
 
 async def test_prices_are_cached_for_the_day(app, api):
+    """같은 조회를 다시 하면 API를 부르지 않고 캐시에서 읽는다."""
     first = await server.get_stock_prices("005930", "2024-11-08", "2024-11-14")
     second = await server.get_stock_prices("005930", "2024-11-08", "2024-11-14")
     assert api.count("getStockPriceInfo") == 1
@@ -399,6 +424,7 @@ async def test_prices_are_cached_for_the_day(app, api):
 
 
 async def test_missing_keys(make_app):
+    """키가 없으면 어떤 환경변수가 필요한지 알려 준다."""
     make_app(dart_key=None, fsc_key=None)
     with pytest.raises(MissingKeyError, match="DART_API_KEY"):
         await server.get_financials("005930", 2025, 3)
@@ -407,11 +433,13 @@ async def test_missing_keys(make_app):
 
 
 async def test_unknown_company_suggests_candidates(app):
+    """회사를 찾지 못하면 이름이 비슷한 상장사를 알려 준다."""
     with pytest.raises(NotFoundError, match="삼성SDI"):
         await server.list_disclosures("삼성S")
 
 
 async def test_source_errors_do_not_leak_keys(app, api):
+    """소스 오류의 사유는 전달하되 메시지에 API 키를 싣지 않는다."""
     api.overrides["list.json"] = httpx.Response(
         200, json={"status": "010", "message": "등록되지 않은 인증키입니다."}
     )
@@ -464,6 +492,7 @@ async def test_no_solicitation_wording_in_structured_output(app):
 
 
 async def test_tools_are_registered_with_mcp():
+    """도구 5개가 등록돼 있고 필수 인자가 스키마에 드러난다."""
     tools = {tool.name: tool for tool in await server.mcp.list_tools()}
     assert set(tools) == {
         "resolve_ticker",
@@ -476,6 +505,7 @@ async def test_tools_are_registered_with_mcp():
 
 
 async def test_request_urls_with_keys_are_not_logged(app, caplog):
+    """키가 든 요청 URL이 로그에 남지 않는다."""
     with caplog.at_level(logging.INFO):
         await server.list_disclosures("005930", limit=20)
     assert "test-dart-key" not in caplog.text

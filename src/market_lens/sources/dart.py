@@ -42,13 +42,32 @@ PAGE_SIZE = 100
 
 
 def _check_status(status: str | None, message: str | None) -> None:
-    """DART 상태 코드가 정상(000)이나 자료 없음(013)이 아니면 SourceError를 던진다."""
+    """DART 상태 코드를 확인한다.
+
+    Args:
+        status: 응답의 status.
+        message: 응답의 message.
+
+    Raises:
+        SourceError: 상태가 정상(000)이나 자료 없음(013)이 아닐 때.
+    """
     if status not in (STATUS_OK, STATUS_NO_DATA):
         raise SourceError(f"DART 오류 {status}: {message}")
 
 
 def _unzip(content: bytes) -> dict[str, bytes]:
-    """ZIP 응답을 푼다. 오류일 때 DART는 ZIP 대신 status/message XML을 돌려준다."""
+    """ZIP 응답을 푼다.
+
+    Args:
+        content: 응답 본문. 오류일 때 DART는 ZIP 대신 status/message XML을 돌려준다.
+
+    Returns:
+        파일 이름 → 내용.
+
+    Raises:
+        NotFoundError: DART가 자료 없음(013)을 돌려줬을 때.
+        SourceError: 그 밖의 오류 응답이거나 해석할 수 없는 응답일 때.
+    """
     if not zipfile.is_zipfile(io.BytesIO(content)):
         text = content.decode("utf-8", errors="replace")
         status = re.search(r"<status>(.*?)</status>", text)
@@ -63,7 +82,14 @@ def _unzip(content: bytes) -> dict[str, bytes]:
 
 
 def _decode(raw: bytes) -> str:
-    """공시 원문을 UTF-8, 안 되면 CP949로 읽는다."""
+    """공시 원문 바이트를 문자열로 읽는다.
+
+    Args:
+        raw: 원문 파일 내용.
+
+    Returns:
+        UTF-8로, 안 되면 CP949로 읽은 문자열. 둘 다 안 되면 깨진 글자를 바꿔 읽는다.
+    """
     for encoding in ("utf-8", "cp949"):
         try:
             return raw.decode(encoding)
@@ -80,7 +106,15 @@ _BLOCK_TAGS = (
 
 
 def document_to_text(markup: str) -> str:
-    """DART 공시 원문(XML/HTML 혼합 마크업)에서 본문 텍스트만 남긴다."""
+    """DART 공시 원문(XML/HTML 혼합 마크업)에서 본문 텍스트만 남긴다.
+
+    Args:
+        markup: 원문 마크업.
+
+    Returns:
+        태그와 머리 정보를 뺀 텍스트. 문단과 표의 한 행이 한 줄이고,
+        표의 칸은 ' | '로 나뉜다.
+    """
     # 서식 버전, 추출용 요약 같은 머리 정보는 본문이 아니다.
     text = re.sub(r"(?is)<(style|script|formula-version|summary)\b.*?</\1>", " ", markup)
     # 원문은 표의 칸마다 줄을 바꿔 적는다. 줄바꿈은 태그로만 정해 한 행이 한 줄이 되게 한다.
@@ -94,7 +128,14 @@ def document_to_text(markup: str) -> str:
 
 
 def _disclosure(row: dict[str, Any]) -> dict[str, Any]:
-    """list.json 한 행 → models.Disclosure 필드."""
+    """list.json의 한 행을 공시 한 건으로 바꾼다.
+
+    Args:
+        row: 원본 행.
+
+    Returns:
+        models.Disclosure의 필드를 담은 dict.
+    """
     return {
         "rcept_no": row["rcept_no"],
         "title": (row.get("report_nm") or "").strip(),
@@ -107,7 +148,16 @@ def _disclosure(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _account(row: dict[str, Any]) -> dict[str, Any]:
-    """fnlttSinglAcnt.json 한 행 → 계정 한 줄. 금액은 정수(원)로 바꾼다."""
+    """fnlttSinglAcnt.json의 한 행을 계정 한 줄로 바꾼다.
+
+    Args:
+        row: 원본 행.
+
+    Returns:
+        name, consolidated(연결 여부), statement(재무제표 이름), is_income(손익 항목
+        여부), 금액과 기간(current, prior, cumulative 계열), currency, rcept_no를
+        담은 dict. 금액은 정수(원)이고 값이 없으면 None.
+    """
     return {
         "name": row.get("account_nm", ""),
         "consolidated": row.get("fs_div") == "CFS",
@@ -125,15 +175,26 @@ def _account(row: dict[str, Any]) -> dict[str, Any]:
 
 
 class DartClient(BaseSource):
-    """DART OpenAPI 호출. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
+    """DART OpenAPI 클라이언트. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
 
     name = "DART"
 
     async def corp_index(self) -> Fetched:
-        """상장사 고유번호 목록: [{corp_code, corp_name, stock_code}]."""
+        """상장사 고유번호 목록을 받는다(1일 캐시).
+
+        Returns:
+            값이 [{corp_code, corp_name, stock_code}]인 Fetched. 비상장사는 빠져 있다.
+
+        Raises:
+            SourceError: DART가 오류를 돌려줬거나 목록이 비어 있을 때.
+        """
 
         async def load() -> list[dict[str, str]]:
-            """고유번호 ZIP을 받아 상장사만 남긴다."""
+            """고유번호 ZIP을 받아 상장사만 남긴다.
+
+            Returns:
+                상장사 목록.
+            """
             response = await self._get(f"{BASE_URL}/corpCode.xml", {"crtfc_key": self._key})
             files = _unzip(response.content)
             root = ElementTree.fromstring(next(iter(files.values())))
@@ -155,7 +216,15 @@ class DartClient(BaseSource):
         return await self._cached("dart:corp_index", TTL_REFERENCE, load)
 
     async def find_corp(self, query: str) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
-        """종목코드 또는 회사명으로 찾는다. (정확히 일치한 회사, 부분 일치 후보)를 돌려준다."""
+        """종목코드나 회사명으로 상장사를 찾는다.
+
+        Args:
+            query: 6자리 종목코드 또는 회사명.
+
+        Returns:
+            (정확히 일치한 회사 또는 None, 이름이 부분 일치한 후보 최대 10건).
+            종목코드로 찾을 때는 후보가 비어 있다.
+        """
         corps = (await self.corp_index()).value
         if is_stock_code(query):
             code = clean_stock_code(query)
@@ -164,16 +233,36 @@ class DartClient(BaseSource):
         target = norm_name(query.strip())
         exact = [c for c in corps if norm_name(c["corp_name"]) == target]
         partial = [c for c in corps if target in norm_name(c["corp_name"])]
+        # 이름이 짧을수록 검색어에 가까운 회사로 보고 앞에 둔다.
         partial.sort(key=lambda c: len(c["corp_name"]))
         return (exact[0] if exact else None), partial[:10]
 
     async def list_disclosures(
         self, corp_code: str, begin: str, end: str, kind: str | None, limit: int
     ) -> Fetched:
-        """공시 목록(최신순): {total_count, items: [Disclosure 필드]}. begin/end는 YYYYMMDD."""
+        """공시 목록을 최신순으로 받는다(1시간 캐시).
+
+        Args:
+            corp_code: DART 고유번호.
+            begin: 시작일(YYYYMMDD).
+            end: 종료일(YYYYMMDD).
+            kind: 공시유형 코드(A~J). None이면 전체.
+            limit: 최대 건수.
+
+        Returns:
+            값이 {total_count, items}인 Fetched. items는 models.Disclosure 필드를 담은
+            dict 목록이다.
+
+        Raises:
+            SourceError: DART가 오류를 돌려줬을 때.
+        """
 
         async def load() -> dict[str, Any]:
-            """limit을 채울 때까지 list.json을 쪽 단위로 받는다."""
+            """limit을 채울 때까지 list.json을 쪽 단위로 받는다.
+
+            Returns:
+                전체 건수와 원본 행 목록.
+            """
             items: list[dict[str, Any]] = []
             total = 0
             page = 1
@@ -191,6 +280,7 @@ class DartClient(BaseSource):
                 payload = self._json(await self._get(f"{BASE_URL}/list.json", params))
                 total = int(payload.get("total_count") or 0)
                 items.extend(payload.get("list") or [])
+                # 마지막 쪽이면 limit을 못 채웠어도 멈춘다.
                 if page >= int(payload.get("total_page") or 1):
                     break
                 page += 1
@@ -201,16 +291,32 @@ class DartClient(BaseSource):
         return listing.map(lambda v: {**v, "items": [_disclosure(row) for row in v["items"]]})
 
     async def document_text(self, rcept_no: str) -> Fetched:
-        """공시 원문 전체 텍스트. 첨부가 여러 개면 본문(접수번호.xml)을 고른다."""
+        """공시 원문의 전체 텍스트를 받는다(30일 캐시).
+
+        Args:
+            rcept_no: 접수번호(14자리).
+
+        Returns:
+            값이 본문 텍스트인 Fetched. 첨부가 여러 개면 본문(접수번호.xml)을 고른다.
+
+        Raises:
+            NotFoundError: 원문이 없을 때.
+            SourceError: DART가 오류를 돌려줬을 때.
+        """
 
         async def load() -> str:
-            """원문 ZIP을 받아 본문 파일을 텍스트로 바꾼다."""
+            """원문 ZIP을 받아 본문 파일을 텍스트로 바꾼다.
+
+            Returns:
+                본문 텍스트.
+            """
             response = await self._get(
                 f"{BASE_URL}/document.xml", {"crtfc_key": self._key, "rcept_no": rcept_no}
             )
             files = _unzip(response.content)
             if not files:
                 raise NotFoundError(f"접수번호 {rcept_no}의 원문 파일이 없습니다.")
+            # 본문 파일 이름은 '접수번호.xml'이다. 없으면 가장 큰 파일을 본문으로 본다.
             main = next(
                 (data for name, data in files.items() if name.startswith(f"{rcept_no}.")),
                 max(files.values(), key=len),
@@ -220,10 +326,27 @@ class DartClient(BaseSource):
         return await self._cached(f"dart:doc:{rcept_no}", TTL_LONG, load)
 
     async def financials(self, corp_code: str, year: int, quarter: int) -> Fetched:
-        """단일회사 주요계정(fnlttSinglAcnt)의 계정 목록. 자료가 없으면 빈 목록."""
+        """단일회사 주요계정(fnlttSinglAcnt)을 받는다(30일 캐시).
+
+        Args:
+            corp_code: DART 고유번호.
+            year: 사업연도.
+            quarter: 1~3은 해당 분기 보고서, 4는 사업보고서.
+
+        Returns:
+            값이 계정 목록(_account 형식)인 Fetched. 자료가 없으면 빈 목록이고,
+            빈 응답은 캐시하지 않는다.
+
+        Raises:
+            SourceError: DART가 오류를 돌려줬을 때.
+        """
 
         async def load() -> list[dict[str, Any]]:
-            """fnlttSinglAcnt.json의 원본 행 목록을 받는다."""
+            """fnlttSinglAcnt.json의 원본 행 목록을 받는다.
+
+            Returns:
+                원본 행 목록. 자료가 없으면 빈 목록.
+            """
             params = {
                 "crtfc_key": self._key,
                 "corp_code": corp_code,
@@ -240,7 +363,17 @@ class DartClient(BaseSource):
 
     @staticmethod
     def _json(response: Any) -> dict[str, Any]:
-        """JSON 응답을 읽고 상태 코드를 확인한다. 자료 없음(013)은 오류로 보지 않는다."""
+        """JSON 응답을 읽고 상태 코드를 확인한다.
+
+        Args:
+            response: HTTP 응답.
+
+        Returns:
+            응답 본문. 자료 없음(013)도 오류로 보지 않고 그대로 돌려준다.
+
+        Raises:
+            SourceError: JSON이 아니거나 DART가 오류 상태를 돌려줬을 때.
+        """
         try:
             payload = response.json()
         except ValueError:

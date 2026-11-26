@@ -19,7 +19,12 @@ class MissingKeyError(MarketLensError):
     """필요한 API 키의 환경변수가 없음. 메시지에 발급받을 곳을 안내한다."""
 
     def __init__(self, env_name: str, where: str):
-        """env_name은 환경변수 이름, where는 키를 발급받는 주소."""
+        """안내 메시지를 만든다.
+
+        Args:
+            env_name: 없는 환경변수 이름.
+            where: 키를 발급받는 주소.
+        """
         super().__init__(
             f"{env_name} 환경변수가 없습니다. {where}에서 키를 발급받아 .env에 넣어 주세요."
         )
