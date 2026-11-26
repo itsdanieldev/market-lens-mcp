@@ -438,6 +438,9 @@ async def test_missing_keys(make_app):
         await server.get_financials("005930", 2025, 3)
     with pytest.raises(MissingKeyError, match="DATA_GO_KR_KEY"):
         await server.get_stock_prices("005930")
+    # 키를 넣는 두 가지 방법을 모두 안내한다
+    with pytest.raises(MissingKeyError, match="설정의 env나 .env 파일"):
+        await server.get_stock_prices("005930")
 
 
 async def test_unknown_company_suggests_candidates(app):
