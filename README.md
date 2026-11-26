@@ -1,5 +1,8 @@
 # market-lens-mcp
 
+[![PyPI](https://img.shields.io/pypi/v/market-lens-mcp)](https://pypi.org/project/market-lens-mcp/)
+[![CI](https://github.com/itsdanieldev/market-lens-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/itsdanieldev/market-lens-mcp/actions/workflows/ci.yml)
+
 한국 주식 리서치용 MCP 서버입니다. Claude Desktop 같은 MCP 클라이언트에 붙이면 상장사의 공시, 재무제표, 주가를 공식 API에서 가져와 출처와 기준일이 붙은 답을 만들 수 있습니다.
 
 투자 권유 도구가 아닙니다. [DISCLAIMER.md](DISCLAIMER.md)를 먼저 읽어 주세요.
@@ -36,29 +39,21 @@
 
 ## 설치
 
-Python 3.11 이상과 [uv](https://docs.astral.sh/uv/)가 필요합니다. MCP Python SDK는 2.x(`MCPServer`)를 씁니다.
+[uv](https://docs.astral.sh/uv/)만 있으면 됩니다. `uvx`가 [PyPI](https://pypi.org/project/market-lens-mcp/)에서 받아 바로 실행하므로 따로 설치할 것이 없습니다. Python 3.11 이상이 필요하고, 없으면 `uv`가 받아 줍니다.
 
-**저장소를 받지 않고 실행하기**
+```bash
+uvx market-lens-mcp
+```
 
-`uvx`가 GitHub에서 받아 바로 실행합니다. 따로 설치할 것이 없고, 아래 "Claude Desktop 설정"에 이 명령을 그대로 적으면 됩니다.
+이 명령을 직접 실행할 일은 거의 없고, 아래 "Claude Desktop 설정"처럼 MCP 클라이언트 설정에 적어 두면 클라이언트가 실행합니다. 키는 직접 발급받아 클라이언트 설정의 `env`로 넘깁니다. 패키지와 저장소에는 키가 들어 있지 않습니다.
+
+아직 배포되지 않은 최신 코드를 쓰려면 GitHub에서 바로 받습니다.
 
 ```bash
 uvx --from git+https://github.com/itsdanieldev/market-lens-mcp market-lens-mcp
 ```
 
-이 방식에서는 저장소 폴더가 없으므로 키를 `.env`가 아니라 MCP 클라이언트 설정의 `env`로 넘깁니다.
-
-**저장소를 받아서 실행하기**
-
-코드를 고치거나 `.env` 파일로 키를 관리하려면 이쪽을 씁니다.
-
-```bash
-git clone https://github.com/itsdanieldev/market-lens-mcp.git
-cd market-lens-mcp
-uv sync
-```
-
-키는 직접 발급받아 넣습니다. 이 저장소에는 키가 들어 있지 않습니다.
+코드를 고치거나 `.env` 파일로 키를 관리하려면 저장소를 받습니다("개발" 참고).
 
 ## 키 발급
 
@@ -90,7 +85,7 @@ uv sync
 
 **MCP 클라이언트 설정의 `env`에 넣기**: 아래 "Claude Desktop 설정"의 예시처럼 클라이언트가 서버를 띄울 때 넘겨줍니다.
 
-**`.env` 파일에 넣기**: 저장소 루트에서 `cp .env.example .env`로 파일을 만들고 값을 채웁니다. `.env`는 git에 올라가지 않습니다.
+**`.env` 파일에 넣기**: 저장소를 받아서 쓸 때의 방법입니다. 저장소 루트에서 `cp .env.example .env`로 파일을 만들고 값을 채웁니다. `.env`는 git에 올라가지 않습니다.
 
 ```bash
 DART_API_KEY=발급받은_40자리_키
@@ -103,14 +98,14 @@ DATA_GO_KR_KEY=발급받은_일반_인증키
 
 ## Claude Desktop 설정
 
-설정 → 데스크톱 앱 → 확장 프로그램 → 로컬 MCP 서버의 "구성 편집"으로 `claude_desktop_config.json`을 열고 아래를 추가한 뒤 앱을 완전히 종료했다가 다시 시작합니다(앱 버전에 따라 메뉴 이름이 다를 수 있습니다). 경로는 이 저장소를 받은 절대 경로로 바꿉니다.
+설정 → 데스크톱 앱 → 확장 프로그램 → 로컬 MCP 서버의 "구성 편집"으로 `claude_desktop_config.json`을 열고 아래를 추가한 뒤 앱을 완전히 종료했다가 다시 시작합니다(앱 버전에 따라 메뉴 이름이 다를 수 있습니다).
 
 ```json
 {
   "mcpServers": {
     "market-lens": {
-      "command": "uv",
-      "args": ["--directory", "/절대/경로/market-lens-mcp", "run", "market-lens-mcp"],
+      "command": "uvx",
+      "args": ["market-lens-mcp"],
       "env": {
         "DART_API_KEY": "발급받은_40자리_키",
         "DATA_GO_KR_KEY": "발급받은_일반_인증키"
@@ -120,18 +115,22 @@ DATA_GO_KR_KEY=발급받은_일반_인증키
 }
 ```
 
-저장소를 받지 않고 쓰려면 `command`와 `args`만 바꿉니다.
+다시 시작한 뒤 같은 화면에 `market-lens`가 실행 중으로 보이면 연결된 것입니다. 앱이 `uvx`를 찾지 못하면 `command`에 `which uvx`로 확인한 전체 경로를 적습니다.
 
-```json
-"command": "uvx",
-"args": ["--from", "git+https://github.com/itsdanieldev/market-lens-mcp", "market-lens-mcp"]
-```
+새 버전이 나오면 `uvx`가 받아 둔 예전 버전을 계속 쓸 수 있습니다. 최신 버전으로 바꾸려면 `uv cache clean market-lens-mcp`를 실행하고 앱을 다시 시작합니다.
 
-저장소를 받아 키를 `.env` 파일에 넣었다면 `env` 블록은 빼도 됩니다. 앱이 `uv`나 `uvx`를 찾지 못하면 `command`에 `which uv`(또는 `which uvx`)로 확인한 전체 경로를 적습니다. 다시 시작한 뒤 같은 화면에 `market-lens`가 실행 중으로 보이면 연결된 것입니다. Claude Code에서는 다음처럼 등록합니다.
+Claude Code에서는 다음처럼 등록합니다.
 
 ```bash
 claude mcp add market-lens -e DART_API_KEY=발급받은_40자리_키 -e DATA_GO_KR_KEY=발급받은_일반_인증키 \
-  -- uv --directory /절대/경로/market-lens-mcp run market-lens-mcp
+  -- uvx market-lens-mcp
+```
+
+저장소를 받아서 쓰는 경우에는 `command`와 `args`를 아래처럼 바꿉니다. 경로는 저장소를 받은 절대 경로입니다. 키를 `.env` 파일에 넣었다면 `env` 블록은 빼도 됩니다.
+
+```json
+"command": "uv",
+"args": ["--directory", "/절대/경로/market-lens-mcp", "run", "market-lens-mcp"]
 ```
 
 ## 사용법
@@ -211,7 +210,12 @@ MCP 클라이언트에 연결한 뒤 대화에서 평소처럼 물어보면 모�
 
 ## 개발
 
+Python 3.11 이상과 [uv](https://docs.astral.sh/uv/)가 필요합니다. MCP Python SDK는 2.x(`MCPServer`)를 씁니다.
+
 ```bash
+git clone https://github.com/itsdanieldev/market-lens-mcp.git
+cd market-lens-mcp
+uv sync
 uv run pytest          # 키와 네트워크 없이 통과합니다
 uv run ruff check .
 uv run ruff format --check .
@@ -226,7 +230,7 @@ uv run python scripts/record_fixtures.py --only fsc   # 공공데이터포털만
 
 API별로 최대 20건을 한 번만 받아 파일로 저장합니다. 이미 녹화한 소스는 `--force` 없이는 API를 다시 호출하지 않습니다. 한 소스가 연결에 실패해도 다른 소스의 녹화는 남습니다. 테스트는 저장된 파일만 읽으므로 몇 번을 돌려도 호출 한도를 쓰지 않습니다. 녹화하면 값이 바뀌므로 `tests/test_tools.py`의 기대값도 함께 고쳐야 합니다. 공공데이터포털(`fsc`) 녹화 결과는 커밋하지 마세요.
 
-릴리스는 `pyproject.toml`과 `src/market_lens/__init__.py`의 버전을 함께 올린 뒤 `v0.1.0` 같은 태그를 푸시하면 `.github/workflows/release.yml`이 테스트, 빌드, PyPI 배포를 합니다. 토큰을 저장소에 두지 않도록 PyPI의 Trusted Publishing을 쓰며, PyPI에서 이 저장소와 워크플로를 신뢰할 게시자로 먼저 등록해야 합니다.
+릴리스는 `pyproject.toml`과 `src/market_lens/__init__.py`의 버전을 함께 올린 뒤 `v0.1.0` 같은 태그를 푸시하면 `.github/workflows/release.yml`이 테스트, 빌드, PyPI 배포를 합니다. 배포 단계는 GitHub의 `pypi` 환경에서 승인해야 진행됩니다. 토큰을 저장소에 두지 않도록 PyPI의 Trusted Publishing을 쓰며, PyPI에서 이 저장소와 워크플로를 신뢰할 게시자로 먼저 등록해야 합니다.
 
 레포 구조:
 
