@@ -1,6 +1,7 @@
-"""market-lens MCP 서버: 한국 주식 리서치 도구 5개.
+"""market-lens MCP 서버: 한국 주식 리서치 도구 5개와 프롬프트 3개.
 
-여기서는 도구의 이름, 인자, 설명만 정의하고 처리는 services에 맡긴다.
+여기서는 도구와 프롬프트의 이름, 인자, 설명만 정의한다. 도구의 처리는 services에,
+프롬프트의 문구는 prompts에 맡긴다.
 모든 도구는 source, as_of가 붙은 공통 형식(models.Envelope)으로 응답한다.
 """
 
@@ -11,7 +12,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
-from . import __version__
+from . import __version__, prompts
 from .app import get_app
 from .services import disclosures, financials, prices, tickers
 
@@ -139,6 +140,68 @@ async def get_stock_prices(
     답변 끝에 응답의 citation(출처·기준일)을 그대로 적는다.
     """
     return await prices.get_stock_prices(get_app().fsc, ticker, start_date, end_date)
+
+
+# 프롬프트는 사용자가 클라이언트 메뉴에서 직접 고른다. 도구 호출을 모델의 판단에 맡기지 않고
+# 어떤 도구를 어떤 순서로 쓸지 정해 주는 수단이다. title과 description은 메뉴에 보이는 글이다.
+@mcp.prompt(
+    title="종목 브리핑",
+    description="한 종목의 최근 실적, 공시, 주가를 도구로 조회해 출처와 함께 정리합니다.",
+)
+def stock_briefing(
+    company: Annotated[str, Field(description="종목명 또는 6자리 종목코드(예: 삼성전자)")],
+) -> str:
+    """실적, 공시, 주가를 한 번에 정리하는 종목 브리핑.
+
+    Args:
+        company: 종목명 또는 6자리 종목코드.
+
+    Returns:
+        모델에게 보낼 프롬프트 문구.
+    """
+    return prompts.stock_briefing(company)
+
+
+@mcp.prompt(
+    title="실적 정리",
+    description="한 분기 또는 한 해의 실적과 그 배경을 근거 보고서와 함께 정리합니다.",
+)
+def earnings_review(
+    company: Annotated[str, Field(description="종목명 또는 6자리 종목코드")],
+    period: Annotated[
+        str, Field(description="대상 기간(예: 2026년 3분기, 2025년 연간). 비우면 가장 최근 분기")
+    ] = "",
+) -> str:
+    """한 분기 또는 한 해의 실적 정리.
+
+    Args:
+        company: 종목명 또는 6자리 종목코드.
+        period: 대상 기간. 비우면 가장 최근 분기.
+
+    Returns:
+        모델에게 보낼 프롬프트 문구.
+    """
+    return prompts.earnings_review(company, period)
+
+
+@mcp.prompt(
+    title="공시 요약",
+    description="최근 공시를 종류별로 묶고 중요한 공시는 본문을 읽어 요약합니다.",
+)
+def disclosure_digest(
+    company: Annotated[str, Field(description="종목명 또는 6자리 종목코드")],
+    days: Annotated[str, Field(description="오늘부터 며칠 전까지 볼지(기본 30)")] = "30",
+) -> str:
+    """최근 공시 요약.
+
+    Args:
+        company: 종목명 또는 6자리 종목코드.
+        days: 오늘부터 며칠 전까지 볼지.
+
+    Returns:
+        모델에게 보낼 프롬프트 문구.
+    """
+    return prompts.disclosure_digest(company, days)
 
 
 def main() -> None:
