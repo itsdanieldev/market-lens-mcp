@@ -38,6 +38,7 @@ async def list_disclosures(
     disclosure_type: str | None,
     limit: int,
 ) -> dict[str, Any]:
+    """기간 안의 공시 목록을 최신순으로 돌려준다. 날짜를 생략하면 오늘까지 30일."""
     end = parse_date(end_date, default=now_kst().date())
     start = parse_date(start_date, default=end - timedelta(days=DEFAULT_DAYS))
     if start > end:
@@ -65,6 +66,7 @@ async def list_disclosures(
 async def disclosure_text(
     dart: dart_api.DartClient, rcept_no: str, max_chars: int, offset: int
 ) -> dict[str, Any]:
+    """공시 본문에서 offset부터 max_chars만큼 돌려준다. as_of는 접수일이다."""
     rcept_no = rcept_no.strip()
     if not re.fullmatch(r"\d{14}", rcept_no):
         raise InvalidInputError("rcept_no는 숫자 14자리여야 합니다.")

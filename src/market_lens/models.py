@@ -28,6 +28,8 @@ class Envelope(BaseModel):
 
 
 class Ticker(BaseModel):
+    """종목 한 건의 식별자 묶음. 소스에서 받지 못한 항목은 null이다."""
+
     short_code: str
     name: str
     isin: str | None = None
@@ -36,12 +38,16 @@ class Ticker(BaseModel):
 
 
 class TickerResult(BaseModel):
+    """resolve_ticker의 data."""
+
     query: str
     match: Ticker | None = Field(description="하나로 확정된 종목. 모호하면 null")
     candidates: list[Ticker] = Field(default_factory=list)
 
 
 class Disclosure(BaseModel):
+    """공시 한 건."""
+
     rcept_no: str = Field(description="접수번호(14자리). get_disclosure_text에 넘긴다")
     title: str
     date: str
@@ -52,6 +58,8 @@ class Disclosure(BaseModel):
 
 
 class DisclosureList(BaseModel):
+    """list_disclosures의 data. total_count는 기간 안의 전체 건수다."""
+
     corp_code: str
     corp_name: str
     start_date: str
@@ -62,6 +70,8 @@ class DisclosureList(BaseModel):
 
 
 class DisclosureText(BaseModel):
+    """get_disclosure_text의 data. 본문이 잘렸으면 next_offset으로 이어 읽는다."""
+
     rcept_no: str
     url: str
     total_chars: int
@@ -89,6 +99,8 @@ class Account(BaseModel):
 
 
 class Financials(BaseModel):
+    """get_financials의 data. accounts에서 찾지 못한 계정은 null이다."""
+
     corp_code: str
     corp_name: str
     year: int
@@ -102,6 +114,8 @@ class Financials(BaseModel):
 
 
 class PriceRow(BaseModel):
+    """하루치 시세. 가격은 원, 거래량은 주. 수정주가가 아니다."""
+
     date: str
     open: int
     high: int
@@ -115,6 +129,8 @@ class PriceRow(BaseModel):
 
 
 class Prices(BaseModel):
+    """get_stock_prices의 data. prices는 날짜 오름차순이다."""
+
     short_code: str
     name: str | None
     isin: str | None

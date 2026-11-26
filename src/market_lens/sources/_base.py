@@ -18,6 +18,8 @@ RETRY_DELAY = 0.5  # 초. 시도마다 두 배
 
 @dataclass(frozen=True)
 class Fetched:
+    """소스에서 받은 값과 그 출처 정보. 도구 응답의 fetched_at, cached가 여기서 나온다."""
+
     value: Any
     fetched_at: float  # epoch 초. 캐시된 값이면 처음 받아 온 시각
     cached: bool
@@ -28,9 +30,12 @@ class Fetched:
 
 
 class BaseSource:
+    """소스 클라이언트의 공통 부모. 하위 클래스는 name을 정하고 _get, _cached로 API를 부른다."""
+
     name = "source"
 
     def __init__(self, api_key: str, http: httpx.AsyncClient, cache: Cache):
+        """api_key는 요청 파라미터로만 쓰고, http와 cache는 밖에서 만들어 넘겨받는다."""
         self._key = api_key
         self._http = http
         self._cache = cache

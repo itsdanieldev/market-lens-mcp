@@ -27,6 +27,7 @@ FINANCIAL_FIXTURES = {
 
 
 def zipped(name: str, content: bytes) -> bytes:
+    """content를 name이라는 파일 하나로 담은 ZIP 바이트."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr(name, content)
@@ -37,13 +38,16 @@ class FakeApi:
     """URL 경로별로 픽스처를 돌려준다. overrides로 특정 경로의 응답을 바꾼다."""
 
     def __init__(self) -> None:
+        """calls에 받은 요청이 쌓이고, overrides에 '경로 일부 → 응답'을 넣으면 그 응답을 준다."""
         self.calls: list[httpx.Request] = []
         self.overrides: dict[str, httpx.Response] = {}
 
     def count(self, fragment: str) -> int:
+        """경로에 fragment가 들어간 요청이 몇 번 왔는지."""
         return sum(1 for request in self.calls if fragment in request.url.path)
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        """httpx.MockTransport가 부르는 처리기. overrides가 먼저고, 없으면 경로에 맞는 픽스처."""
         self.calls.append(request)
         path = request.url.path
         for fragment, response in self.overrides.items():
@@ -71,15 +75,18 @@ class FakeApi:
 
 @pytest.fixture
 def api() -> FakeApi:
+    """요청을 기록하고 픽스처로 답하는 가짜 API."""
     return FakeApi()
 
 
 @pytest.fixture
 def make_app(api, tmp_path, monkeypatch):
+    """가짜 API와 메모리 캐시로 App을 만들어 끼우는 함수. 키를 None으로 주면 그 키가 없는 상태가 된다."""
     monkeypatch.setattr(_base, "RETRY_DELAY", 0)
     created = []
 
     def factory(dart_key: str | None = DART_KEY, fsc_key: str | None = FSC_KEY) -> App:
+        """주어진 키로 App을 만들어 전역으로 끼운다."""
         settings = Settings(dart_key, fsc_key, tmp_path / "cache.sqlite3")
         app = App(
             settings,
@@ -96,4 +103,5 @@ def make_app(api, tmp_path, monkeypatch):
 
 @pytest.fixture
 def app(make_app) -> App:
+    """두 키가 모두 있는 기본 App."""
     return make_app()

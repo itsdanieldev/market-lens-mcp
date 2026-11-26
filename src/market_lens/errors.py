@@ -8,7 +8,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 
 class MarketLensError(ToolError):
-    pass
+    """이 서버가 던지는 오류의 공통 부모. 메시지가 모델에게 그대로 전달된다."""
 
 
 class InvalidInputError(MarketLensError, ValueError):
@@ -16,7 +16,10 @@ class InvalidInputError(MarketLensError, ValueError):
 
 
 class MissingKeyError(MarketLensError):
+    """필요한 API 키의 환경변수가 없음. 메시지에 발급받을 곳을 안내한다."""
+
     def __init__(self, env_name: str, where: str):
+        """env_name은 환경변수 이름, where는 키를 발급받는 주소."""
         super().__init__(
             f"{env_name} 환경변수가 없습니다. {where}에서 키를 발급받아 .env에 넣어 주세요."
         )
@@ -27,4 +30,4 @@ class SourceError(MarketLensError):
 
 
 class NotFoundError(MarketLensError):
-    pass
+    """요청한 회사, 종목, 자료가 소스에 없음."""

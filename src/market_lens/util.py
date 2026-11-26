@@ -27,10 +27,12 @@ def norm_name(name: str) -> str:
 
 
 def now_kst() -> datetime:
+    """한국 시간(KST) 기준 현재 시각."""
     return datetime.now(KST)
 
 
 def iso_kst(epoch: float) -> str:
+    """epoch 초를 KST ISO 8601 문자열(초 단위)로 바꾼다."""
     return datetime.fromtimestamp(epoch, KST).isoformat(timespec="seconds")
 
 
@@ -46,10 +48,12 @@ def parse_date(value: str | None, *, default: date) -> date:
 
 
 def ymd(d: date) -> str:
+    """날짜를 'YYYYMMDD'로 바꾼다(API 요청용)."""
     return d.strftime("%Y%m%d")
 
 
 def ymd_to_iso(value: str) -> str:
+    """'YYYYMMDD'를 'YYYY-MM-DD'로 바꾼다. 8자리가 아니면 그대로 돌려준다."""
     return f"{value[:4]}-{value[4:6]}-{value[6:8]}" if len(value) == 8 else value
 
 
@@ -67,6 +71,7 @@ def to_int(value: object) -> int | None:
 
 
 def to_float(value: object) -> float | None:
+    """'-.96', '1,234.5', '-', '' 같은 API 문자열을 실수로 바꾼다. 값이 없으면 None."""
     if value is None:
         return None
     text = str(value).replace(",", "").strip()

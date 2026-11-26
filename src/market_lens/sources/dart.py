@@ -42,6 +42,7 @@ PAGE_SIZE = 100
 
 
 def _check_status(status: str | None, message: str | None) -> None:
+    """DART 상태 코드가 정상(000)이나 자료 없음(013)이 아니면 SourceError를 던진다."""
     if status not in (STATUS_OK, STATUS_NO_DATA):
         raise SourceError(f"DART 오류 {status}: {message}")
 
@@ -62,6 +63,7 @@ def _unzip(content: bytes) -> dict[str, bytes]:
 
 
 def _decode(raw: bytes) -> str:
+    """공시 원문을 UTF-8, 안 되면 CP949로 읽는다."""
     for encoding in ("utf-8", "cp949"):
         try:
             return raw.decode(encoding)
@@ -123,12 +125,15 @@ def _account(row: dict[str, Any]) -> dict[str, Any]:
 
 
 class DartClient(BaseSource):
+    """DART OpenAPI 호출. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
+
     name = "DART"
 
     async def corp_index(self) -> Fetched:
         """상장사 고유번호 목록: [{corp_code, corp_name, stock_code}]."""
 
         async def load() -> list[dict[str, str]]:
+            """고유번호 ZIP을 받아 상장사만 남긴다."""
             response = await self._get(f"{BASE_URL}/corpCode.xml", {"crtfc_key": self._key})
             files = _unzip(response.content)
             root = ElementTree.fromstring(next(iter(files.values())))
@@ -168,6 +173,7 @@ class DartClient(BaseSource):
         """공시 목록(최신순): {total_count, items: [Disclosure 필드]}. begin/end는 YYYYMMDD."""
 
         async def load() -> dict[str, Any]:
+            """limit을 채울 때까지 list.json을 쪽 단위로 받는다."""
             items: list[dict[str, Any]] = []
             total = 0
             page = 1
@@ -198,6 +204,7 @@ class DartClient(BaseSource):
         """공시 원문 전체 텍스트. 첨부가 여러 개면 본문(접수번호.xml)을 고른다."""
 
         async def load() -> str:
+            """원문 ZIP을 받아 본문 파일을 텍스트로 바꾼다."""
             response = await self._get(
                 f"{BASE_URL}/document.xml", {"crtfc_key": self._key, "rcept_no": rcept_no}
             )
@@ -216,6 +223,7 @@ class DartClient(BaseSource):
         """단일회사 주요계정(fnlttSinglAcnt)의 계정 목록. 자료가 없으면 빈 목록."""
 
         async def load() -> list[dict[str, Any]]:
+            """fnlttSinglAcnt.json의 원본 행 목록을 받는다."""
             params = {
                 "crtfc_key": self._key,
                 "corp_code": corp_code,
@@ -232,6 +240,7 @@ class DartClient(BaseSource):
 
     @staticmethod
     def _json(response: Any) -> dict[str, Any]:
+        """JSON 응답을 읽고 상태 코드를 확인한다. 자료 없음(013)은 오류로 보지 않는다."""
         try:
             payload = response.json()
         except ValueError:

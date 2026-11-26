@@ -37,6 +37,7 @@ def three_months(period: str | None) -> str | None:
 def _pick_accounts(
     rows: list[dict[str, Any]], quarter: int, warnings: list[str]
 ) -> dict[str, Account | None]:
+    """계정 목록에서 ACCOUNT_MATCHERS에 맞는 계정을 고른다. 못 찾은 계정은 None으로 두고 warnings에 적는다."""
     accounts: dict[str, Account | None] = {}
     for key, matches in ACCOUNT_MATCHERS.items():
         row = next((r for r in rows if matches(norm_name(r["name"]))), None)
@@ -59,10 +60,14 @@ def _pick_accounts(
 
 
 def _compute(accounts: dict[str, Account | None]) -> dict[str, Any]:
+    """이익률, 부채비율, 계정별 증감률을 계산한다. 계산할 수 없는 값은 None."""
+
     def cur(key: str) -> int | None:
+        """계정의 당기 금액. 계정이 없으면 None."""
         return accounts[key].current if accounts[key] else None
 
     def prior(key: str) -> int | None:
+        """계정의 비교 금액. 계정이 없으면 None."""
         return accounts[key].prior if accounts[key] else None
 
     computed: dict[str, Any] = {
@@ -83,6 +88,7 @@ def _compute(accounts: dict[str, Account | None]) -> dict[str, Any]:
 async def get_financials(
     dart: dart_api.DartClient, ticker: str, year: int, quarter: int
 ) -> dict[str, Any]:
+    """한 회사의 주요 계정과 파생 수치를 돌려준다. 연결재무제표가 없으면 별도 기준."""
     corp = await find_corp(dart, ticker)
     fetched = await dart.financials(corp["corp_code"], year, quarter)
     rows: list[dict[str, Any]] = fetched.value

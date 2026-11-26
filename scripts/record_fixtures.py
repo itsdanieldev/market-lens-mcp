@@ -57,10 +57,12 @@ class RecordError(Exception):
 
 
 def as_json(payload: dict) -> bytes:
+    """픽스처 파일 형식(들여쓰기 1칸, 한글 그대로)으로 직렬화한다."""
     return (json.dumps(payload, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
 
 
 def parse_json(name: str, response: httpx.Response) -> dict:
+    """응답을 JSON으로 읽는다. JSON이 아니면 원인을 담아 RecordError를 던진다."""
     try:
         return response.json()
     except ValueError:
@@ -72,6 +74,7 @@ def parse_json(name: str, response: httpx.Response) -> dict:
 
 
 def dart_json(name: str, response: httpx.Response) -> dict:
+    """DART JSON 응답을 읽고 상태가 정상(000)이 아니면 RecordError를 던진다."""
     payload = parse_json(name, response)
     if payload.get("status") != dart.STATUS_OK:
         raise RecordError(f"{name}: DART 오류 {payload.get('status')} {payload.get('message')}")
@@ -79,6 +82,7 @@ def dart_json(name: str, response: httpx.Response) -> dict:
 
 
 def fsc_json(name: str, response: httpx.Response) -> dict:
+    """공공데이터포털 JSON 응답을 읽고 형식이나 결과코드가 다르면 RecordError를 던진다."""
     payload = parse_json(name, response)
     header = (payload.get("response") or {}).get("header") if isinstance(payload, dict) else None
     if not isinstance(header, dict):
@@ -93,6 +97,7 @@ def fsc_json(name: str, response: httpx.Response) -> dict:
 
 
 def unzip_first(name: str, content: bytes) -> bytes:
+    """ZIP 응답의 첫 파일 내용을 돌려준다. ZIP이 아니면 DART 상태 코드를 담아 RecordError."""
     if not zipfile.is_zipfile(io.BytesIO(content)):
         status = re.search(rb"<status>(.*?)</status>", content)
         detail = status.group(1).decode() if status else "알 수 없는 응답"
@@ -112,6 +117,7 @@ def mask_filers(listing: dict) -> dict:
 
 
 def record_dart(http: httpx.Client, settings: Settings, today: date) -> Files:
+    """DART 고유번호, 공시 목록, 공시 원문 한 건, 3분기 재무를 받아 파일 내용으로 돌려준다."""
     key = {"crtfc_key": settings.dart_api_key}
     files: Files = {}
 
@@ -186,6 +192,7 @@ REPORT_FIXTURES = (
 
 
 def record_dart_reports(http: httpx.Client, settings: Settings, today: date) -> Files:
+    """1분기·반기·사업보고서의 재무 응답을 받아 파일 내용으로 돌려준다."""
     files: Files = {}
     for filename, quarter, years_ago in REPORT_FIXTURES:
         response = http.get(
@@ -202,6 +209,10 @@ def record_dart_reports(http: httpx.Client, settings: Settings, today: date) -> 
 
 
 def record_fsc(http: httpx.Client, settings: Settings, today: date) -> Files:
+    """공공데이터포털 상장종목정보와 주식시세를 받아 파일 내용으로 돌려준다.
+
+    실제 시세는 재배포할 수 없으므로 이 결과는 커밋하지 않는다.
+    """
     common = {
         "serviceKey": settings.data_go_kr_key,
         "resultType": "json",
@@ -242,6 +253,7 @@ SOURCES: dict[str, tuple[str, str, Callable[[httpx.Client, Settings, date], File
 
 
 def load_manifest() -> dict:
+    """RECORDED.json을 읽는다. 없으면 빈 기록을 돌려준다."""
     if not MANIFEST.exists():
         return {"max_rows": MAX_ROWS, "sources": {}}
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -250,6 +262,7 @@ def load_manifest() -> dict:
 
 
 def main() -> int:
+    """인자에 따라 소스를 녹화하고 RECORDED.json을 갱신한다. 하나라도 실패하면 1을 돌려준다."""
     parser = argparse.ArgumentParser(description="실제 API 응답을 tests/fixtures/에 녹화한다.")
     parser.add_argument("--only", choices=sorted(SOURCES), help="이 소스만 녹화한다")
     parser.add_argument("--force", action="store_true", help="이미 녹화한 소스도 다시 받는다")

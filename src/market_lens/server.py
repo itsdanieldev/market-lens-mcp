@@ -115,6 +115,7 @@ async def get_stock_prices(
 
 
 def main() -> None:
+    """표준 입출력(stdio)으로 MCP 서버를 실행한다. market-lens-mcp 명령의 진입점."""
     mcp.run()
 
 

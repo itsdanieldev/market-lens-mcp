@@ -35,6 +35,7 @@ async def _short_code(fsc: fsc_api.FscClient, ticker: str, fetched: list[Fetched
 async def get_stock_prices(
     fsc: fsc_api.FscClient, ticker: str, start_date: str | None, end_date: str | None
 ) -> dict[str, Any]:
+    """기간 안의 일별 시세와 기간 요약을 돌려준다. 날짜를 생략하면 오늘까지 90일."""
     end = parse_date(end_date, default=now_kst().date())
     start = parse_date(start_date, default=end - timedelta(days=DEFAULT_DAYS))
     if start > end:

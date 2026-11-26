@@ -61,12 +61,15 @@ def _price(row: dict[str, Any]) -> dict[str, Any]:
 
 
 class FscClient(BaseSource):
+    """공공데이터포털 금융위원회 API 호출. 응답은 캐시하고 원본 필드는 정규화해서 돌려준다."""
+
     name = "공공데이터포털"
 
     async def search_items(self, *, name: str | None = None, code: str | None = None) -> Fetched:
         """상장종목 검색(이름 부분 일치 또는 단축코드). 종목별 최신 기준일 한 건씩 돌려준다."""
 
         async def load() -> list[dict[str, str]]:
+            """최근 며칠 치 종목 행을 받아 종목별 최신 기준일 한 건만 남긴다."""
             params: dict[str, Any] = {
                 "beginBasDt": ymd(now_kst().date() - timedelta(days=ITEM_LOOKBACK_DAYS))
             }
@@ -89,6 +92,7 @@ class FscClient(BaseSource):
         """일별 시세(날짜 오름차순). begin, end 모두 포함."""
 
         async def load() -> list[dict[str, Any]]:
+            """기간 안의 원본 시세 행을 받아 코드가 정확히 같은 행만 날짜순으로 남긴다."""
             params = {
                 "likeSrtnCd": code,
                 "beginBasDt": ymd(begin),
@@ -103,6 +107,7 @@ class FscClient(BaseSource):
         return rows.map(lambda v: [_price(row) for row in v])
 
     async def _fetch_all(self, url: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """전체 건수를 채울 때까지 페이지를 넘기며 받는다(최대 MAX_PAGES 쪽)."""
         rows: list[dict[str, Any]] = []
         for page in range(1, MAX_PAGES + 1):
             query = {
@@ -120,6 +125,7 @@ class FscClient(BaseSource):
 
 
 def _parse(response: Any) -> tuple[list[dict[str, Any]], int]:
+    """응답에서 (행 목록, 전체 건수)를 꺼낸다. 오류 응답이면 사유를 담아 SourceError를 던진다."""
     try:
         payload = response.json()
         header = payload["response"]["header"]

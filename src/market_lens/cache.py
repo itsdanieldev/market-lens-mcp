@@ -33,12 +33,20 @@ def seconds_until_kst_midnight(now: float | None = None) -> int:
 
 @dataclass(frozen=True)
 class CacheHit:
+    """캐시에서 읽은 값과 그 값을 저장한 시각(epoch 초)."""
+
     value: Any
     stored_at: float
 
 
 class Cache:
+    """키·값·만료 시각을 SQLite 테이블 하나에 두는 TTL 캐시. 값은 JSON으로 저장한다."""
+
     def __init__(self, path: Path | str, clock: Callable[[], float] = time.time):
+        """path에 DB를 열고(':memory:'면 메모리) 만료된 항목을 지운다.
+
+        clock은 테스트에서 시각을 바꿀 때 쓴다.
+        """
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.now = clock
@@ -52,6 +60,7 @@ class Cache:
         self._db.commit()
 
     def get(self, key: str) -> CacheHit | None:
+        """만료되지 않은 값을 돌려준다. 없거나 만료됐으면 None."""
         row = self._db.execute(
             "SELECT value, stored_at FROM cache WHERE key = ? AND expires_at > ?",
             (key, self.now()),
@@ -59,6 +68,7 @@ class Cache:
         return CacheHit(json.loads(row[0]), row[1]) if row else None
 
     def set(self, key: str, value: Any, ttl_seconds: float) -> None:
+        """값을 ttl_seconds 동안 저장한다. 같은 키가 있으면 덮어쓴다."""
         now = self.now()
         self._db.execute(
             "INSERT OR REPLACE INTO cache (key, value, stored_at, expires_at) VALUES (?, ?, ?, ?)",
@@ -67,4 +77,5 @@ class Cache:
         self._db.commit()
 
     def close(self) -> None:
+        """DB 연결을 닫는다."""
         self._db.close()

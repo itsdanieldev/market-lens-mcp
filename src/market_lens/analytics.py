@@ -18,6 +18,7 @@ def pct_change(current: float | None, prior: float | None) -> float | None:
 
 
 def ratio_pct(numerator: float | None, denominator: float | None) -> float | None:
+    """비율(%). 분자나 분모가 없거나 분모가 0 이하면 None."""
     if numerator is None or denominator is None or denominator <= 0:
         return None
     return round(numerator / denominator * 100, 2)
