@@ -16,6 +16,7 @@ from mcp import Client
 from market_lens import server
 from market_lens.app import get_app
 from market_lens.errors import MissingKeyError, NotFoundError, SourceError
+from market_lens.services._common import citation
 from market_lens.services.financials import three_months
 from market_lens.sources.dart import document_to_text
 
@@ -32,7 +33,13 @@ def assert_envelope(result: dict) -> None:
     """
     assert result.keys() >= ENVELOPE_KEYS
     assert result["source"] and result["as_of"]
-    assert result["citation"] == f"출처: {result['source']} · 기준일: {result['as_of']}"
+    if "T" in result["as_of"]:
+        # 기준이 시각이면 인용 문구에서는 'T'와 초, 시간대 표기를 풀어 쓴다
+        date, time = result["as_of"].split("T")
+        expected = f"출처: {result['source']} · 기준 시각: {date} {time[:5]} KST"
+    else:
+        expected = f"출처: {result['source']} · 기준일: {result['as_of']}"
+    assert result["citation"] == expected
 
 
 async def test_resolve_ticker_by_name(app):
@@ -509,6 +516,19 @@ async def test_every_tool_response_carries_a_citation(app):
     assert results[4]["citation"] == (
         "출처: 공공데이터포털 금융위원회_주식시세정보 · 기준일: 2024-11-14"
     )
+
+
+def test_citation_spells_out_timestamps():
+    """기준이 날짜면 그대로, 시각이면 사람이 읽기 좋게 KST로 풀어 쓴다."""
+    assert citation("DART", "2026-09-30") == "출처: DART · 기준일: 2026-09-30"
+    assert citation("DART", "2026-11-26T15:20:24+09:00") == (
+        "출처: DART · 기준 시각: 2026-11-26 15:20 KST"
+    )
+    # 다른 시간대로 와도 KST로 바꿔 적는다
+    assert citation("DART", "2026-11-26T06:20:24+00:00") == (
+        "출처: DART · 기준 시각: 2026-11-26 15:20 KST"
+    )
+    assert citation("DART", "2026") == "출처: DART · 기준일: 2026"
 
 
 async def test_tool_descriptions_ask_for_the_citation():

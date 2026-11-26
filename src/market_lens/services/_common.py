@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from ..errors import NotFoundError
 from ..models import Envelope
 from ..sources._base import Fetched
 from ..sources.dart import DartClient
-from ..util import iso_kst
+from ..util import KST, iso_kst
 
 
 def citation(source: str, as_of: str) -> str:
@@ -16,13 +17,26 @@ def citation(source: str, as_of: str) -> str:
 
     출처와 기준일을 모델이 직접 조합하게 두면 한쪽을 빠뜨리기 쉬워 완성된 문장으로 준다.
 
+    as_of 필드는 프로그램이 읽기 좋은 ISO 형식 그대로 두고, 사람이 읽는 이 문구에서만
+    시각을 '2026-11-26 15:20 KST'처럼 풀어 쓴다.
+
     Args:
         source: 데이터 출처 이름.
-        as_of: 데이터 기준일 또는 기준 시각.
+        as_of: 데이터 기준일('2026-09-30') 또는 기준 시각('2026-11-26T15:20:24+09:00').
 
     Returns:
-        '출처: … · 기준일: …' 형식의 문구.
+        날짜면 '출처: … · 기준일: 2026-09-30', 시각이면
+        '출처: … · 기준 시각: 2026-11-26 15:20 KST' 형식의 문구.
     """
+    if "T" in as_of:
+        try:
+            moment = datetime.fromisoformat(as_of)
+        except ValueError:
+            pass  # 시각으로 읽을 수 없으면 받은 값 그대로 적는다
+        else:
+            if moment.tzinfo is not None:
+                moment = moment.astimezone(KST)
+            return f"출처: {source} · 기준 시각: {moment:%Y-%m-%d %H:%M} KST"
     return f"출처: {source} · 기준일: {as_of}"
 
 
